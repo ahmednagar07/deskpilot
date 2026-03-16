@@ -134,7 +134,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
         className="text-3xl font-bold mb-3"
         style={{
           fontFamily: 'Sora, sans-serif',
-          background: 'linear-gradient(90deg, #E8E6F0, #9B7FFF)',
+          background: 'linear-gradient(90deg, var(--t-title-gradient-from), var(--t-title-gradient-to))',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
         }}

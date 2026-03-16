@@ -7,7 +7,7 @@ import * as fileRepo from '../../database/repositories/file-repo';
 import * as scanRepo from '../../database/repositories/scan-repo';
 import { classifyByRules } from './rule-engine';
 import { classifyWithGemini, hasGeminiApiKey, ReviewItem } from './gemini-client';
-import { getCategoryBySlug, getCategoryById } from './categories';
+import { getCategoryBySlug, getCategoryById, getCategories } from './categories';
 
 // Directories to skip during file discovery
 const SKIP_DIRS = new Set([
@@ -225,8 +225,10 @@ export function resolveReviewItem(filePath: string, categorySlug: string): boole
  */
 export function getClassifiedFiles(): Array<TrackedFile & { category_name?: string; category_slug?: string; category_color?: string }> {
   const files = fileRepo.getUnorganizedFiles();
+  // Build a Map for O(1) lookups instead of O(n) .find() per file
+  const catMap = new Map(getCategories().map(c => [c.id, c]));
   return files.map(f => {
-    const cat = f.category_id ? getCategoryById(f.category_id) : null;
+    const cat = f.category_id ? catMap.get(f.category_id) : undefined;
     return {
       ...f,
       category_name: cat?.name,

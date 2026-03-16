@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useToastStore } from '../../stores/toast-store';
+import { useThemeStore } from '../../stores/theme-store';
 
 interface ManagedFolder {
   id: number;
@@ -122,7 +123,7 @@ export default function SettingsPage() {
     }
   };
 
-  const settingsSaveTimer = React.useRef<ReturnType<typeof setTimeout>>();
+  const settingsSaveTimer = React.useRef<ReturnType<typeof setTimeout>>(undefined);
   const handleSaveSetting = (key: string, value: unknown) => {
     setSettings(prev => ({ ...prev, [key]: value }));
     // Debounce IPC writes for text/number inputs
@@ -275,6 +276,18 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Appearance */}
+      <div className="v-card p-5">
+        <h2 className="section-label mb-4">Appearance</h2>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground font-medium">Theme</p>
+            <p className="text-xs text-faint mt-0.5">Switch between dark and light mode.</p>
+          </div>
+          <ThemeToggle />
+        </div>
+      </div>
+
       {/* Updates */}
       <div className="v-card p-5">
         <h2 className="section-label mb-3">Updates</h2>
@@ -366,5 +379,39 @@ export default function SettingsPage() {
         <p className="text-xs text-faint mt-1">Smart desktop file management. Never deletes without asking.</p>
       </div>
     </div>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useThemeStore();
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      onClick={toggleTheme}
+      className="relative w-16 h-8 rounded-full transition-colors duration-300 cursor-pointer"
+      style={{ background: isDark ? 'rgba(124, 92, 252, 0.2)' : 'rgba(124, 92, 252, 0.12)' }}
+      aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+    >
+      <div
+        className="absolute top-1 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300"
+        style={{
+          left: isDark ? '2.25rem' : '0.25rem',
+          background: isDark ? '#7C5CFC' : '#F0C246',
+          boxShadow: isDark ? '0 0 8px rgba(124,92,252,0.4)' : '0 0 8px rgba(240,194,70,0.4)',
+        }}
+      >
+        {isDark ? (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </svg>
+        ) : (
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="none">
+            <circle cx="12" cy="12" r="5" />
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="white" strokeWidth="2" fill="none" />
+          </svg>
+        )}
+      </div>
+    </button>
   );
 }

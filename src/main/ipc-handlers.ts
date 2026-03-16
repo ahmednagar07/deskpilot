@@ -15,7 +15,7 @@ import { executePlan } from './modules/auto-organizer/move-executor';
 import { undoMove, undoSession, getUndoHistory, getSessionDetails } from './modules/auto-organizer/undo-manager';
 import { MovePlanItem } from '../shared/types';
 import { searchFiles, rebuildIndex } from './modules/quick-search/searcher';
-import { getWatchedFolderCount } from './modules/background-watcher/watcher';
+import { getWatchedFolderCount, startWatching } from './modules/background-watcher/watcher';
 import { findDuplicates } from './modules/storage-analyzer/duplicate-finder';
 import { getAllFilesWithSize } from './database/repositories/file-repo';
 import { checkForUpdates, downloadUpdate, installUpdate } from './updater';
@@ -81,24 +81,29 @@ export function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(IpcChannels.SETTINGS_SET_FOLDERS, (_event, action: string, data: unknown) => {
+    let result: unknown = false;
     switch (action) {
       case 'add': {
         const { path: folderPath, label, watchMode } = data as { path: string; label: string; watchMode: string };
-        return scanRepo.addManagedFolder(folderPath, label, watchMode);
+        result = scanRepo.addManagedFolder(folderPath, label, watchMode);
+        break;
       }
       case 'update': {
         const { id, updates } = data as { id: number; updates: Record<string, unknown> };
         scanRepo.updateManagedFolder(id, updates);
-        return true;
+        result = true;
+        break;
       }
       case 'remove': {
         const { id } = data as { id: number };
         scanRepo.removeManagedFolder(id);
-        return true;
+        result = true;
+        break;
       }
-      default:
-        return false;
     }
+    // Reload watchers so they reflect the updated folder list
+    if (result) startWatching();
+    return result;
   });
 
   // ── Categories ───────────────────────────────────────

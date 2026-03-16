@@ -34,10 +34,10 @@ export function getWeeklyStats(): DigestStats {
     `SELECT COUNT(*) as count FROM move_log WHERE executed_at >= ? AND operation = 'move' AND is_undone = 0`
   ).get(oneWeekAgo) as { count: number };
 
-  // Bytes reclaimed (cleaned) this week
+  // Bytes reclaimed (cleaned) this week — use scanned_at as proxy since cleaned_at column doesn't exist
   const reclaimed = db.prepare(
-    `SELECT COALESCE(SUM(size_bytes), 0) as total FROM storage_scans WHERE is_cleaned = 1`
-  ).get() as { total: number };
+    `SELECT COALESCE(SUM(size_bytes), 0) as total FROM storage_scans WHERE is_cleaned = 1 AND scanned_at >= ?`
+  ).get(oneWeekAgo) as { total: number };
 
   // Top categories by file count this week
   const topCategories = db.prepare(`

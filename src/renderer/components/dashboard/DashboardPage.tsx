@@ -65,7 +65,7 @@ function DonutChart({ segments, size = 180, strokeWidth = 22, centerLabel, cente
     <div style={{ position: 'relative', width: size, height: size, margin: '0 auto 12px' }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: 'visible' }}>
         {/* Background track */}
-        <circle cx={center} cy={center} r={radius} fill="none" stroke="#1a1a2e" strokeWidth={strokeWidth} />
+        <circle cx={center} cy={center} r={radius} fill="none" stroke="var(--t-donut-track)" strokeWidth={strokeWidth} />
         {arcs.map((arc) => {
           const isHovered = hoveredIdx === arc.idx;
           return (
@@ -100,22 +100,22 @@ function DonutChart({ segments, size = 180, strokeWidth = 22, centerLabel, cente
       }}>
         {hoveredIdx !== null ? (
           <>
-            <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 20, fontWeight: 700, color: '#E8E6F0', lineHeight: 1.1 }}>
+            <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 20, fontWeight: 700, color: 'var(--t-foreground)', lineHeight: 1.1 }}>
               {arcs[hoveredIdx].value}
             </span>
-            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: '#8E8BA8', marginTop: 2, maxWidth: size * 0.5, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: 'var(--t-muted)', marginTop: 2, maxWidth: size * 0.5, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {arcs[hoveredIdx].label}
             </span>
           </>
         ) : (
           <>
             {centerLabel && (
-              <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 700, color: '#E8E6F0', lineHeight: 1.1 }}>
+              <span style={{ fontFamily: 'Sora, sans-serif', fontSize: 22, fontWeight: 700, color: 'var(--t-foreground)', lineHeight: 1.1 }}>
                 {centerLabel}
               </span>
             )}
             {centerSub && (
-              <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: '#8E8BA8', marginTop: 2 }}>
+              <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: 10, color: 'var(--t-muted)', marginTop: 2 }}>
                 {centerSub}
               </span>
             )}
@@ -273,12 +273,10 @@ export default function DashboardPage() {
             />
           )}
           <div className="space-y-2.5">
-            {data.byCategory
-              .filter(c => c.count > 0)
-              .sort((a, b) => b.count - a.count)
-              .map(cat => {
-                const maxCount = Math.max(...data.byCategory.map(c => c.count));
-                return (
+            {(() => {
+              const sorted = data.byCategory.filter(c => c.count > 0).sort((a, b) => b.count - a.count);
+              const maxCount = sorted.length > 0 ? sorted[0].count : 1;
+              return sorted.map(cat => (
                   <div key={cat.category_slug} className="group flex items-center gap-3">
                     <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: cat.color, boxShadow: `0 0 6px ${cat.color}40` }} />
                     <span className="text-[13px] text-foreground w-24 truncate">{cat.category_name}</span>
@@ -288,8 +286,8 @@ export default function DashboardPage() {
                     <span className="text-xs text-faint w-16 text-right font-mono">{formatBytes(cat.total_size)}</span>
                     <span className="text-xs text-muted font-medium w-8 text-right font-mono">{cat.count}</span>
                   </div>
-                );
-              })}
+                ));
+            })()}
             {data.byCategory.every(c => c.count === 0) && (
               <div className="flex flex-col items-center py-6">
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-faint/30 mb-3">
@@ -353,7 +351,7 @@ function WelcomeDashboard() {
         </div>
       </div>
 
-      <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Sora, sans-serif', background: 'linear-gradient(90deg, #E8E6F0, #9B7FFF)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+      <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Sora, sans-serif', background: 'linear-gradient(90deg, var(--t-title-gradient-from), var(--t-title-gradient-to))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
         Welcome to DeskPilot
       </h1>
       <p className="text-muted text-center max-w-md mb-10">

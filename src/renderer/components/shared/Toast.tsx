@@ -81,12 +81,12 @@ function ToastItem({ toast }: { toast: Toast }) {
       style={{
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        background: 'rgba(10, 10, 20, 0.90)',
+        background: 'var(--t-toast-bg)',
         transform: isEntered && !isExiting ? 'translateX(0)' : 'translateX(120%)',
         opacity: isExiting ? 0 : 1,
         maxWidth: '420px',
         minWidth: '300px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+        boxShadow: 'var(--t-toast-shadow)',
       }}
     >
       {/* Left accent bar */}

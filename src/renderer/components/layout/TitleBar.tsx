@@ -7,10 +7,10 @@ export default function TitleBar() {
 
   return (
     <div className="drag-region relative flex items-center justify-between h-10 px-4 select-none shrink-0"
-      style={{ background: 'linear-gradient(90deg, #0c0c1a, #10102a)' }}>
+      style={{ background: 'var(--t-titlebar-bg)' }}>
       {/* Holographic bottom border */}
       <div className="absolute bottom-0 left-0 right-0 h-px"
-        style={{ background: 'linear-gradient(90deg, transparent, rgba(124,92,252,0.2) 30%, rgba(34,211,238,0.12) 70%, transparent)' }} />
+        style={{ background: 'var(--t-holo-edge)' }} />
 
       <div className="flex items-center gap-3">
         <div className="relative w-[22px] h-[22px] rounded-lg flex items-center justify-center"
@@ -25,13 +25,13 @@ export default function TitleBar() {
         <span className="text-[13px] font-semibold tracking-tight"
           style={{
             fontFamily: 'Sora, sans-serif',
-            background: 'linear-gradient(90deg, #E8E6F0, #9B7FFF)',
+            background: 'linear-gradient(90deg, var(--t-title-gradient-from), var(--t-title-gradient-to))',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
           }}>
           DeskPilot
         </span>
-        <span className="text-faint/35 text-[10px] font-mono">0.1.0</span>
+        <span className="text-faint/35 text-[10px] font-mono">0.1.2</span>
       </div>
 
       <div className="no-drag flex items-center">

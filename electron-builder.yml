@@ -12,7 +12,9 @@ files:
   - "!node_modules/**/*.{md,txt,map}"
 
 win:
-  target: nsis
+  target:
+    - nsis
+    - portable
   icon: resources/icon.ico
   signAndEditExecutable: false
 
@@ -20,6 +22,32 @@ nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+
+mac:
+  target:
+    - dmg
+    - zip
+  icon: resources/icon.png
+  category: public.app-category.utilities
+  darkModeSupport: true
+
+dmg:
+  title: "${productName} ${version}"
+  artifactName: "${productName}-${version}-mac.${ext}"
+
+linux:
+  target:
+    - AppImage
+    - deb
+  icon: resources/icon.png
+  category: Utility
+  desktop:
+    Name: DeskPilot
+    Comment: Smart desktop file management
+    Terminal: false
+
+appImage:
+  artifactName: "${productName}-${version}-linux.${ext}"
 
 publish:
   provider: github

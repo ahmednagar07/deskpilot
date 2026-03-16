@@ -74,7 +74,7 @@ export default function StoragePage() {
     toggleItem, selectAllOfType, deselectAll, removeCleanedItems,
     duplicateGroups, isDuplicateScanning, duplicateProgress, selectedDuplicates,
     setDuplicateGroups, setIsDuplicateScanning, setDuplicateProgress,
-    toggleDuplicate, clearDuplicates,
+    toggleDuplicate, clearDuplicateSelection, clearDuplicates,
   } = useStorageStore();
 
   const addToast = useToastStore(s => s.addToast);
@@ -117,37 +117,45 @@ export default function StoragePage() {
   const handleDeleteDuplicates = async () => {
     if (selectedDuplicates.size === 0) return;
     setDeletingDuplicates(true);
-    let succeeded = 0;
-    let failed = 0;
-    for (const filePath of selectedDuplicates) {
-      try {
-        await window.api.invoke('storage:delete-duplicate', filePath);
-        succeeded++;
-      } catch (err) {
-        console.error('Failed to delete duplicate:', filePath, err);
-        failed++;
+    try {
+      let succeeded = 0;
+      let failed = 0;
+      for (const filePath of selectedDuplicates) {
+        try {
+          await window.api.invoke('storage:delete-duplicate', filePath);
+          succeeded++;
+        } catch (err) {
+          console.error('Failed to delete duplicate:', filePath, err);
+          failed++;
+        }
       }
-    }
-    // Remove deleted files from duplicate groups
-    const deletedPaths = new Set(selectedDuplicates);
-    const updatedGroups = duplicateGroups
-      .map(group => ({
-        ...group,
-        files: group.files.filter(f => !deletedPaths.has(f)),
-      }))
-      .filter(group => group.files.length >= 2);
-    setDuplicateGroups(updatedGroups);
-    // Clear selections
-    const newSelected = new Set<string>();
-    useStorageStore.setState({ selectedDuplicates: newSelected });
-    setDeletingDuplicates(false);
-    // Refresh drive info
-    const updatedDrives = await window.api.invoke('storage:drives') as DriveInfo[];
-    setDrives(updatedDrives);
-    if (failed > 0) {
-      addToast('warning', `Deleted ${succeeded} files, ${failed} failed`);
-    } else {
-      addToast('success', `Moved ${succeeded} duplicate files to Recycle Bin`);
+      // Remove deleted files from duplicate groups
+      const deletedPaths = new Set(selectedDuplicates);
+      const updatedGroups = duplicateGroups
+        .map(group => ({
+          ...group,
+          files: group.files.filter(f => !deletedPaths.has(f)),
+        }))
+        .filter(group => group.files.length >= 2);
+      setDuplicateGroups(updatedGroups);
+      clearDuplicateSelection();
+      // Refresh drive info
+      try {
+        const updatedDrives = await window.api.invoke('storage:drives') as DriveInfo[];
+        setDrives(updatedDrives);
+      } catch (err) {
+        console.error('Failed to refresh drive info:', err);
+      }
+      if (failed > 0) {
+        addToast('warning', `Deleted ${succeeded} files, ${failed} failed`);
+      } else {
+        addToast('success', `Moved ${succeeded} duplicate files to Recycle Bin`);
+      }
+    } catch (err) {
+      console.error('handleDeleteDuplicates failed:', err);
+      addToast('error', 'Failed to delete duplicate files');
+    } finally {
+      setDeletingDuplicates(false);
     }
   };
 

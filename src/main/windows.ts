@@ -29,7 +29,7 @@ export function createDashboardWindow(): BrowserWindow {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
     icon: path.join(__dirname, '../../resources/icon.ico'),
   });
@@ -90,7 +90,7 @@ export function createSearchWindow(): BrowserWindow {
       preload: getPreloadPath(),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: false,
+      sandbox: true,
     },
   });
 

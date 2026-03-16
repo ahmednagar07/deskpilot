@@ -63,10 +63,8 @@ if (!gotTheLock) {
     // Start weekly digest scheduler
     startDigestScheduler();
 
-    // Check for updates after a short delay so the window loads first
-    setTimeout(() => {
-      checkForUpdates();
-    }, 5000);
+    // Check for updates (only in packaged builds — dev mode handled gracefully in updater.ts)
+    setTimeout(() => checkForUpdates(), 5000);
 
     console.log('DeskPilot started successfully');
   });

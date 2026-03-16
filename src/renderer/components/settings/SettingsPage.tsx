@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useToastStore } from '../../stores/toast-store';
 import { useThemeStore } from '../../stores/theme-store';
+import { useI18n, LOCALE_NAMES, type Locale } from '../../i18n';
 
 interface ManagedFolder {
   id: number;
@@ -52,23 +53,33 @@ export default function SettingsPage() {
       }),
       window.api?.on('updater:error', () => {
         setUpdateStatus('error');
-        addToast('error', 'Update check failed');
+        // No toast — the inline "Update check failed / Retry" in the Updates section is sufficient
       }),
     ];
 
     return () => { unsubs.forEach(fn => fn?.()); };
   }, []);
 
+  // Cleanup debounce timer on unmount
+  React.useEffect(() => {
+    return () => { if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current); };
+  }, []);
+
   const loadData = async () => {
-    const [f, hasKey, organizedRoot, scanDepth] = await Promise.all([
-      window.api.invoke('settings:get-folders') as Promise<ManagedFolder[]>,
-      window.api.invoke('gemini:has-key') as Promise<boolean>,
-      window.api.invoke('settings:get', 'organized_root') as Promise<string>,
-      window.api.invoke('settings:get', 'scan_depth') as Promise<number>,
-    ]);
-    setFolders(f);
-    setHasGeminiKey(hasKey);
-    setSettings({ organized_root: organizedRoot, scan_depth: scanDepth });
+    try {
+      const [f, hasKey, organizedRoot, scanDepth] = await Promise.all([
+        window.api.invoke('settings:get-folders') as Promise<ManagedFolder[]>,
+        window.api.invoke('gemini:has-key') as Promise<boolean>,
+        window.api.invoke('settings:get', 'organized_root') as Promise<string>,
+        window.api.invoke('settings:get', 'scan_depth') as Promise<number>,
+      ]);
+      setFolders(f);
+      setHasGeminiKey(hasKey);
+      setSettings({ organized_root: organizedRoot, scan_depth: scanDepth });
+    } catch (err) {
+      console.error('Failed to load settings:', err);
+      addToast('error', 'Failed to load settings');
+    }
   };
 
   const handleSaveApiKey = async () => {
@@ -266,7 +277,7 @@ export default function SettingsPage() {
             <input
               type="number"
               value={(settings.scan_depth as number) || 5}
-              onChange={(e) => handleSaveSetting('scan_depth', parseInt(e.target.value))}
+              onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) handleSaveSetting('scan_depth', v); }}
               min={1}
               max={20}
               className="w-20 px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground focus:outline-none focus:border-accent"
@@ -279,12 +290,19 @@ export default function SettingsPage() {
       {/* Appearance */}
       <div className="v-card p-5">
         <h2 className="section-label mb-4">Appearance</h2>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-4">
           <div>
             <p className="text-sm text-foreground font-medium">Theme</p>
             <p className="text-xs text-faint mt-0.5">Switch between dark and light mode.</p>
           </div>
           <ThemeToggle />
+        </div>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground font-medium">Language</p>
+            <p className="text-xs text-faint mt-0.5">Choose your preferred display language.</p>
+          </div>
+          <LanguageSelector />
         </div>
       </div>
 
@@ -413,5 +431,22 @@ function ThemeToggle() {
         )}
       </div>
     </button>
+  );
+}
+
+function LanguageSelector() {
+  const { locale, setLocale } = useI18n();
+
+  return (
+    <select
+      value={locale}
+      onChange={(e) => setLocale(e.target.value as Locale)}
+      className="px-3 py-1.5 bg-surface border border-edge rounded-lg text-sm text-foreground cursor-pointer focus:outline-none focus:border-accent"
+      aria-label="Select language"
+    >
+      {Object.entries(LOCALE_NAMES).map(([code, name]) => (
+        <option key={code} value={code}>{name}</option>
+      ))}
+    </select>
   );
 }

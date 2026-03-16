@@ -87,10 +87,14 @@ function DashboardApp() {
 
   return (
     <div className="noise flex flex-col h-full w-full bg-surface">
+      {/* Skip to main content link — visible only on focus for keyboard users */}
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-accent focus:text-white focus:rounded-lg focus:text-sm focus:font-medium">
+        Skip to main content
+      </a>
       <TitleBar />
       <div className="flex flex-1 overflow-hidden">
         <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
-        <main className="flex-1 overflow-y-auto p-8 bg-mesh min-h-0">
+        <main id="main-content" className="flex-1 overflow-y-auto p-8 bg-mesh min-h-0" aria-label={`${currentPage.charAt(0).toUpperCase() + currentPage.slice(1)} page`}>
           <div className="page-enter h-full" key={currentPage}>
             <PageErrorBoundary page={currentPage}>
               <PageContent page={currentPage} />

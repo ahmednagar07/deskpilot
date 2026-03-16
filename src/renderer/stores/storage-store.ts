@@ -64,6 +64,7 @@ interface StorageState {
   setIsDuplicateScanning: (scanning: boolean) => void;
   setDuplicateProgress: (progress: DuplicateProgress | null) => void;
   toggleDuplicate: (filePath: string) => void;
+  clearDuplicateSelection: () => void;
   clearDuplicates: () => void;
 }
 
@@ -129,6 +130,8 @@ export const useStorageStore = create<StorageState>((set, get) => ({
     }
     set({ selectedDuplicates: selected });
   },
+
+  clearDuplicateSelection: () => set({ selectedDuplicates: new Set() }),
 
   clearDuplicates: () => set({
     duplicateGroups: [],

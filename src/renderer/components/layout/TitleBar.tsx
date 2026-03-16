@@ -6,8 +6,8 @@ export default function TitleBar() {
   const handleClose = () => window.api?.invoke('window:close');
 
   return (
-    <div className="drag-region relative flex items-center justify-between h-10 px-4 select-none shrink-0"
-      style={{ background: 'var(--t-titlebar-bg)' }}>
+    <header className="drag-region relative flex items-center justify-between h-10 px-4 select-none shrink-0"
+      role="banner" style={{ background: 'var(--t-titlebar-bg)' }}>
       {/* Holographic bottom border */}
       <div className="absolute bottom-0 left-0 right-0 h-px"
         style={{ background: 'var(--t-holo-edge)' }} />
@@ -31,26 +31,29 @@ export default function TitleBar() {
           }}>
           DeskPilot
         </span>
-        <span className="text-faint/35 text-[10px] font-mono">0.1.2</span>
+        <span className="text-faint/35 text-[10px] font-mono">0.2.0</span>
       </div>
 
-      <div className="no-drag flex items-center">
+      <div className="no-drag flex items-center" role="group" aria-label="Window controls">
         <button onClick={handleMinimize}
+          aria-label="Minimize window"
           className="w-11 h-10 flex items-center justify-center text-faint/50 hover:text-foreground hover:bg-white/[0.04] transition-all duration-200"
           title="Minimize">
-          <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor"><rect width="10" height="1" /></svg>
+          <svg width="10" height="1" viewBox="0 0 10 1" fill="currentColor" aria-hidden="true"><rect width="10" height="1" /></svg>
         </button>
         <button onClick={handleMaximize}
+          aria-label="Maximize window"
           className="w-11 h-10 flex items-center justify-center text-faint/50 hover:text-foreground hover:bg-white/[0.04] transition-all duration-200"
           title="Maximize">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1" aria-hidden="true"><rect x="0.5" y="0.5" width="9" height="9" /></svg>
         </button>
         <button onClick={handleClose}
+          aria-label="Close window"
           className="w-11 h-10 flex items-center justify-center text-faint/50 hover:text-white hover:bg-danger/80 transition-all duration-200"
           title="Close">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor"><path d="M1 0L0 1L4 5L0 9L1 10L5 6L9 10L10 9L6 5L10 1L9 0L5 4L1 0Z" /></svg>
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"><path d="M1 0L0 1L4 5L0 9L1 10L5 6L9 10L10 9L6 5L10 1L9 0L5 4L1 0Z" /></svg>
         </button>
       </div>
-    </div>
+    </header>
   );
 }

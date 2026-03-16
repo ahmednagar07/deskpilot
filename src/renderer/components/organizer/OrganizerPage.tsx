@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useOrganizerStore, UndoSession } from '../../stores/organizer-store';
 import { useToastStore } from '../../stores/toast-store';
 import { MovePlanItem, Category } from '../../../shared/types';
@@ -20,9 +20,9 @@ function shortPath(p: string): string {
 /** Build a new destPath for a file when it's reclassified to a different category */
 function buildDestPath(item: MovePlanItem, targetPath: string): string {
   const fileName = item.suggestedName || item.currentName;
-  // Normalise slashes and join
+  // Normalise slashes and join with forward slash (consistent with rest of codebase)
   const base = targetPath.replace(/[\\/]+$/, '');
-  return `${base}\\${fileName}`;
+  return `${base}/${fileName}`;
 }
 
 export default function OrganizerPage() {
@@ -153,20 +153,23 @@ export default function OrganizerPage() {
     addToast('success', `Moved file to "${categoryName}"`);
   }, [draggingFileId, allCategories, plan, setPlan, addToast]);
 
-  const approvedCount = plan.filter(p => p.approved).length;
+  const approvedCount = useMemo(() => plan.filter(p => p.approved).length, [plan]);
 
-  // Group plan by category
-  const grouped = plan.reduce<Record<string, MovePlanItem[]>>((acc, item) => {
+  // Group plan by category — memoized to avoid O(n) re-grouping on every render
+  const grouped = useMemo(() => plan.reduce<Record<string, MovePlanItem[]>>((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
-  }, {});
+  }, {}), [plan]);
 
   // Categories present in the plan
-  const categoriesInPlan = new Set(Object.keys(grouped));
+  const categoriesInPlan = useMemo(() => new Set(Object.keys(grouped)), [grouped]);
 
   // Categories NOT in the current plan (for the floating dock)
-  const dockCategories = allCategories.filter(c => !categoriesInPlan.has(c.name));
+  const dockCategories = useMemo(
+    () => allCategories.filter(c => !categoriesInPlan.has(c.name)),
+    [allCategories, categoriesInPlan]
+  );
 
   return (
     <div className="space-y-6 relative pb-20">
@@ -333,7 +336,7 @@ export default function OrganizerPage() {
           <span className="text-[10px] uppercase tracking-widest text-faint mr-2 select-none">
             Drop onto category
           </span>
-          {allCategories.map(cat => (
+          {dockCategories.map(cat => (
             <CategoryDockPill
               key={cat.id}
               category={cat}
@@ -385,7 +388,7 @@ function CategoryDockPill({
 
 const ITEMS_PER_PAGE = 50;
 
-function PlanGroup({
+const PlanGroup = React.memo(function PlanGroup({
   category,
   items,
   onToggle,
@@ -535,4 +538,4 @@ function PlanGroup({
       )}
     </div>
   );
-}
+});

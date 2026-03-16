@@ -1,6 +1,6 @@
 {
   "name": "deskpilot",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Smart desktop management app — organize files, clean storage, find anything instantly",
   "main": "dist/main/index.js",
   "scripts": {
@@ -13,6 +13,11 @@
     "build:renderer": "vite build src/renderer",
     "start": "electron dist/main/index.js",
     "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "dist:all": "npm run build && electron-builder --win --mac --linux",
+    "generate-icons": "node scripts/generate-icons.mjs",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "test": "vitest"
   },
@@ -41,9 +46,11 @@
     "concurrently": "^9.2.1",
     "electron": "^41.0.2",
     "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1",
     "postcss": "^8.5.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "sharp": "^0.34.5",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vite": "^6.4.1",

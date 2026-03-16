@@ -23,7 +23,10 @@ export interface ReviewItem {
   question: string;           // Question the AI wants to ask the user
 }
 
-const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent';
+// Using gemini-3.1-flash-lite-preview: fast, cost-efficient model for file classification
+// Stable alternative: gemini-2.5-flash-lite | Docs: https://ai.google.dev/gemini-api/docs/models
+const GEMINI_MODEL = 'gemini-3.1-flash-lite-preview';
+const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 const BATCH_SIZE = 15; // Slightly smaller batches for richer responses
 const CONFIDENCE_THRESHOLD = 0.6; // Below this → ask user
 
@@ -188,9 +191,12 @@ Be genuinely curious and helpful. Respond with ONLY the JSON array.`;
 // ── API call helpers ─────────────────────────────────────────────────
 
 async function callGemini(prompt: string, apiKey: string): Promise<string> {
-  const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
+  const response = await fetch(GEMINI_API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: {

@@ -53,13 +53,13 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   }, []);
 
   return (
-    <nav className="relative flex flex-col w-56 shrink-0" style={{ background: 'var(--t-sidebar-bg)' }}>
+    <nav className="relative flex flex-col w-56 shrink-0" style={{ background: 'var(--t-sidebar-bg)' }} aria-label="Main navigation">
       {/* Right edge glow line */}
       <div className="absolute top-0 right-0 bottom-0 w-px"
         style={{ background: 'var(--t-sidebar-edge)' }} />
 
-      <div className="flex-1 py-4 px-3 space-y-0.5">
-        <div className="section-label px-3 mb-3">Navigation</div>
+      <div className="flex-1 py-4 px-3 space-y-0.5" role="menubar" aria-label="Main menu">
+        <div className="section-label px-3 mb-3" aria-hidden="true">Navigation</div>
         {mainNav.map((item) => (
           <NavButton key={item.id} item={item} isActive={currentPage === item.id} onClick={() => onNavigate(item.id)} />
         ))}
@@ -74,6 +74,7 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         {/* Theme toggle */}
         <button
           onClick={toggleTheme}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
           className="w-full flex items-center gap-3 px-3 py-[9px] rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer"
           style={{
             fontFamily: 'DM Sans, sans-serif',
@@ -119,6 +120,8 @@ function NavButton({ item, isActive, onClick }: { item: NavItem; isActive: boole
   return (
     <button
       onClick={onClick}
+      role="menuitem"
+      aria-current={isActive ? 'page' : undefined}
       className="relative w-full flex items-center gap-3 px-3 py-[9px] rounded-xl text-[13px] font-medium transition-all duration-200 cursor-pointer"
       style={{
         fontFamily: 'DM Sans, sans-serif',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useScanStore, ScannedFile, ScanResult, ReviewItem } from '../../stores/scan-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useIpcEvent } from '../../hooks/useIpc';
@@ -199,13 +199,13 @@ export default function ScannerPage() {
     }
   };
 
-  // Group files by category
-  const grouped = files.reduce<Record<string, ScannedFile[]>>((acc, file) => {
+  // Group files by category — memoized to avoid re-grouping on every render
+  const grouped = useMemo(() => files.reduce<Record<string, ScannedFile[]>>((acc, file) => {
     const key = file.category_slug || 'uncategorized';
     if (!acc[key]) acc[key] = [];
     acc[key].push(file);
     return acc;
-  }, {});
+  }, {}), [files]);
 
   return (
     <div className="space-y-6">
@@ -524,7 +524,7 @@ function Stat({ label, value, color }: { label: string; value: number; color?: s
   );
 }
 
-function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) {
+const CategoryGroup = React.memo(function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) {
   const [expanded, setExpanded] = useState(false);
   const name = items[0]?.category_name || 'Uncategorized';
   const color = items[0]?.category_color || '#6B7280';
@@ -598,7 +598,7 @@ function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) 
       )}
     </div>
   );
-}
+});
 
 function ConfidenceBadge({ method, confidence }: { method: string | null; confidence: number | null }) {
   if (!method) {

@@ -1,9 +1,10 @@
 import { autoUpdater } from 'electron-updater';
-import { BrowserWindow } from 'electron';
+import { app, BrowserWindow } from 'electron';
 import { IpcChannels } from '../shared/ipc-channels';
 
 // Don't auto-download — let the user confirm first
 autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 
 // ── Helper to send events to the renderer ────────────────────
 function sendToRenderer(channel: string, ...args: unknown[]): void {
@@ -45,6 +46,14 @@ autoUpdater.on('error', (err) => {
 // ── Exported actions ─────────────────────────────────────────
 export async function checkForUpdates(): Promise<void> {
   console.log('[Updater] checkForUpdates() called');
+
+  // In dev mode, electron-updater can't resolve the update feed — tell the user gracefully
+  if (!app.isPackaged) {
+    console.log('[Updater] Skipping update check in dev mode');
+    sendToRenderer(IpcChannels.UPDATER_NOT_AVAILABLE, { version: app.getVersion() });
+    return;
+  }
+
   try {
     await autoUpdater.checkForUpdates();
   } catch (err) {

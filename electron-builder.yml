@@ -21,6 +21,9 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
 
-publish: null
+publish:
+  provider: github
+  owner: ahmednagar07
+  repo: deskpilot
 
 # Database is created at runtime in userData, not bundled

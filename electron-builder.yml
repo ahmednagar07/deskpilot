@@ -17,11 +17,16 @@ win:
     - portable
   icon: resources/icon.ico
   signAndEditExecutable: false
+  artifactName: "${productName}-Setup-${version}.${ext}"
+
+portable:
+  artifactName: "${productName}-${version}-portable.${ext}"
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  artifactName: "${productName}-Setup-${version}.${ext}"
 
 mac:
   target:

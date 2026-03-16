@@ -9,6 +9,8 @@ interface ManagedFolder {
   watch_mode: string;
 }
 
+type UpdateStatus = 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+
 export default function SettingsPage() {
   const [folders, setFolders] = useState<ManagedFolder[]>([]);
   const [hasGeminiKey, setHasGeminiKey] = useState(false);
@@ -18,9 +20,42 @@ export default function SettingsPage() {
   const addToast = useToastStore(s => s.addToast);
   const [newFolderPath, setNewFolderPath] = useState('');
   const [newFolderLabel, setNewFolderLabel] = useState('');
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
+  const [downloadProgress, setDownloadProgress] = useState(0);
+  const [appVersion, setAppVersion] = useState('0.1.0');
 
   useEffect(() => {
     loadData();
+
+    // Fetch app version
+    window.api?.invoke('app:get-version').then((v: unknown) => {
+      if (typeof v === 'string') setAppVersion(v);
+    }).catch(() => {});
+
+    // Listen for updater events
+    const unsubs = [
+      window.api?.on('updater:checking', () => setUpdateStatus('checking')),
+      window.api?.on('updater:available', () => setUpdateStatus('available')),
+      window.api?.on('updater:not-available', () => {
+        setUpdateStatus('not-available');
+        addToast('info', 'You are on the latest version');
+      }),
+      window.api?.on('updater:download-progress', (...args: unknown[]) => {
+        setUpdateStatus('downloading');
+        const progress = args[0] as { percent?: number };
+        if (progress?.percent) setDownloadProgress(Math.round(progress.percent));
+      }),
+      window.api?.on('updater:downloaded', () => {
+        setUpdateStatus('downloaded');
+        addToast('success', 'Update downloaded — ready to install');
+      }),
+      window.api?.on('updater:error', () => {
+        setUpdateStatus('error');
+        addToast('error', 'Update check failed');
+      }),
+    ];
+
+    return () => { unsubs.forEach(fn => fn?.()); };
   }, []);
 
   const loadData = async () => {
@@ -215,13 +250,93 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Updates */}
+      <div className="v-card p-5">
+        <h2 className="section-label mb-3">Updates</h2>
+        <div className="flex items-center gap-4">
+          {updateStatus === 'idle' && (
+            <button
+              onClick={() => window.api?.invoke('updater:check')}
+              className="btn-primary rounded-xl px-5 py-2.5 text-sm font-medium cursor-pointer"
+            >
+              Check for Updates
+            </button>
+          )}
+          {updateStatus === 'checking' && (
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <span className="text-sm text-muted">Checking for updates...</span>
+            </div>
+          )}
+          {updateStatus === 'available' && (
+            <button
+              onClick={() => window.api?.invoke('updater:download')}
+              className="btn-primary rounded-xl px-5 py-2.5 text-sm font-medium cursor-pointer"
+            >
+              Download Update
+            </button>
+          )}
+          {updateStatus === 'downloading' && (
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-sm text-muted">Downloading update...</span>
+                <span className="text-xs font-mono text-accent">{downloadProgress}%</span>
+              </div>
+              <div className="w-full h-2 bg-edge/30 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-300"
+                  style={{
+                    width: `${downloadProgress}%`,
+                    background: 'linear-gradient(90deg, #7C5CFC, #A78BFA)',
+                  }}
+                />
+              </div>
+            </div>
+          )}
+          {updateStatus === 'downloaded' && (
+            <button
+              onClick={() => window.api?.invoke('updater:install')}
+              className="rounded-xl px-5 py-2.5 text-sm font-semibold cursor-pointer text-white"
+              style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
+            >
+              Install & Restart
+            </button>
+          )}
+          {updateStatus === 'not-available' && (
+            <div className="flex items-center gap-2">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
+                <path d="M20 6L9 17l-5-5" />
+              </svg>
+              <span className="text-sm text-muted">Up to date</span>
+              <button
+                onClick={() => setUpdateStatus('idle')}
+                className="text-xs text-faint hover:text-muted cursor-pointer ml-2"
+              >
+                Check again
+              </button>
+            </div>
+          )}
+          {updateStatus === 'error' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-danger">Update check failed</span>
+              <button
+                onClick={() => { setUpdateStatus('idle'); }}
+                className="text-xs text-faint hover:text-muted cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* About */}
       <div className="v-card p-5 bg-gradient-to-br from-card to-surface/50">
         <h2 className="section-label mb-2">About</h2>
         <p className="text-sm">
           <span className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-transparent font-bold">DeskPilot</span>
           {' '}
-          <span className="font-mono text-xs text-muted">v0.1.0</span>
+          <span className="font-mono text-xs text-muted">v{appVersion}</span>
         </p>
         <p className="text-xs text-faint mt-1">Smart desktop file management. Never deletes without asking.</p>
       </div>

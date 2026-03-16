@@ -1,0 +1,26 @@
+appId: com.deskpilot.app
+productName: DeskPilot
+copyright: Copyright © 2026 Nagar
+
+directories:
+  output: release
+  buildResources: resources
+
+files:
+  - dist/**/*
+  - resources/**/*
+  - "!node_modules/**/*.{md,txt,map}"
+
+win:
+  target: nsis
+  icon: resources/icon.ico
+  signAndEditExecutable: false
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+
+publish: null
+
+# Database is created at runtime in userData, not bundled

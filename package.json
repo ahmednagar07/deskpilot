@@ -1,6 +1,6 @@
 {
   "name": "deskpilot",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Smart desktop management app — organize files, clean storage, find anything instantly",
   "main": "dist/main/index.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "build": "npm run build:main && npm run build:renderer",
     "copy:sql": "node -e \"const fs=require('fs'),p=require('path');const s='src/main/database/migrations',d='dist/main/database/migrations';fs.mkdirSync(d,{recursive:true});fs.readdirSync(s).filter(f=>f.endsWith('.sql')).forEach(f=>fs.copyFileSync(p.join(s,f),p.join(d,f)));console.log('Copied migrations to '+d)\"",
     "build:main": "tsc -p tsconfig.main.json && npm run copy:sql",
-    "build:renderer": "vite build src/renderer",
+    "build:renderer": "vite build",
     "start": "electron dist/main/index.js",
     "dist": "npm run build && electron-builder",
     "dist:win": "npm run build && electron-builder --win",

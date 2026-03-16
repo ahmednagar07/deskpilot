@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useScanStore, ScannedFile, ScanResult, ReviewItem } from '../../stores/scan-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useIpcEvent } from '../../hooks/useIpc';
+import { useI18n } from '../../i18n';
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   clients: (
@@ -90,6 +91,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function ScannerPage() {
+  const { t } = useI18n();
   const {
     isScanning, scanProgress, scanResult, files, reviewItems,
     selectedFolders, useGemini, hasGeminiKey,
@@ -158,11 +160,11 @@ export default function ScannerPage() {
       if (pending.length > 0) {
         addToast('info', `AI needs your help with ${pending.length} file${pending.length > 1 ? 's' : ''}`);
       } else {
-        addToast('success', `Scan complete: ${classified.length} files classified`);
+        addToast('success', t('scanner.scanComplete', { count: classified.length }));
       }
     } catch (err) {
       console.error('Scan failed:', err);
-      addToast('error', 'File scan failed. Check logs for details.');
+      addToast('error', t('toast.scanFailed'));
     } finally {
       setIsScanning(false);
       setScanProgress(null);
@@ -193,7 +195,7 @@ export default function ScannerPage() {
       setHasGeminiKey(true);
       setApiKeyInput('');
       setShowApiKeyForm(false);
-      addToast('success', 'API key saved');
+      addToast('success', t('toast.apiKeySaved'));
     } catch (err) {
       addToast('error', 'Failed to save API key');
     }
@@ -212,17 +214,15 @@ export default function ScannerPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-[Sora]">File Scanner</h1>
-          <p className="text-muted text-sm mt-1">
-            Discover and classify files in your managed folders.
-          </p>
+          <h1 className="text-2xl font-bold text-foreground font-[Sora]">{t('scanner.title')}</h1>
+          <p className="text-muted text-sm mt-1">{t('scanner.subtitle')}</p>
         </div>
         <button
           onClick={handleScan}
           disabled={isScanning || selectedFolders.length === 0}
           className="px-5 py-2.5 btn-primary rounded-xl disabled:opacity-50 font-medium text-sm transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
-          {isScanning ? 'Scanning...' : 'Scan & Classify'}
+          {isScanning ? t('scanner.scanning') : t('scanner.scanClassify')}
         </button>
       </div>
 
@@ -230,7 +230,7 @@ export default function ScannerPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Folder Checkboxes */}
         <div className="lg:col-span-2 v-card p-4">
-          <h2 className="section-label mb-3">Folders to Scan</h2>
+          <h2 className="section-label mb-3">{t('scanner.foldersToScan')}</h2>
           <div className="space-y-2">
             {managedFolders.map((folder) => (
               <label key={folder.id} className="flex items-center gap-3 cursor-pointer">
@@ -247,14 +247,14 @@ export default function ScannerPage() {
               </label>
             ))}
             {managedFolders.length === 0 && (
-              <p className="text-sm text-faint">No managed folders configured. Add folders in Settings.</p>
+              <p className="text-sm text-faint">{t('scanner.noFolders')}</p>
             )}
           </div>
         </div>
 
         {/* AI Options */}
         <div className="v-card p-4">
-          <h2 className="section-label mb-3">AI Classification</h2>
+          <h2 className="section-label mb-3">{t('scanner.aiClassification')}</h2>
           <label className="flex items-center gap-3 cursor-pointer mb-3">
             <input
               type="checkbox"
@@ -263,7 +263,7 @@ export default function ScannerPage() {
               disabled={!hasGeminiKey}
               className="w-4 h-4 rounded accent-accent"
             />
-            <span className="text-sm text-foreground">Use Gemini AI for ambiguous files</span>
+            <span className="text-sm text-foreground">{t('scanner.useGemini')}</span>
           </label>
 
           {!hasGeminiKey && (
@@ -297,18 +297,16 @@ export default function ScannerPage() {
                   onClick={() => setShowApiKeyForm(true)}
                   className="text-xs text-accent hover:text-accent-hover cursor-pointer"
                 >
-                  + Add Gemini API Key
+                  {t('scanner.addApiKey')}
                 </button>
               )}
             </div>
           )}
           {hasGeminiKey && (
-            <p className="text-xs text-success mt-1">API key configured</p>
+            <p className="text-xs text-success mt-1">{t('scanner.apiKeyConfigured')}</p>
           )}
 
-          <p className="text-xs text-faint mt-3">
-            Files matching rules are classified instantly. AI handles ambiguous files and will ask you about uncertain ones.
-          </p>
+          <p className="text-xs text-faint mt-3">{t('scanner.aiHint')}</p>
         </div>
       </div>
 
@@ -343,15 +341,15 @@ export default function ScannerPage() {
       {/* Scan Summary */}
       {scanResult && (
         <div className="v-card p-4 flex items-center gap-6 flex-wrap">
-          <Stat label="Discovered" value={scanResult.totalDiscovered} />
-          <Stat label="Rule-classified" value={scanResult.ruleClassified} color="text-success" />
-          <Stat label="AI-classified" value={scanResult.geminiClassified} color="text-accent" />
+          <Stat label={t('scanner.discovered')} value={scanResult.totalDiscovered} />
+          <Stat label={t('scanner.ruleClassified')} value={scanResult.ruleClassified} color="text-success" />
+          <Stat label={t('scanner.aiClassified')} value={scanResult.geminiClassified} color="text-accent" />
           {scanResult.needsReview > 0 && (
-            <Stat label="Needs Your Input" value={scanResult.needsReview} color="text-warning" />
+            <Stat label={t('scanner.needsInput')} value={scanResult.needsReview} color="text-warning" />
           )}
-          <Stat label="Unclassified" value={scanResult.unclassified} color="text-faint" />
+          <Stat label={t('scanner.unclassified')} value={scanResult.unclassified} color="text-faint" />
           {scanResult.errors.length > 0 && (
-            <Stat label="Errors" value={scanResult.errors.length} color="text-danger" />
+            <Stat label={t('scanner.errors')} value={scanResult.errors.length} color="text-danger" />
           )}
         </div>
       )}
@@ -369,7 +367,7 @@ export default function ScannerPage() {
               </svg>
             </div>
             <div>
-              <h2 className="text-lg font-bold text-foreground font-[Sora]">AI Needs Your Input</h2>
+              <h2 className="text-lg font-bold text-foreground font-[Sora]">{t('scanner.aiNeedsInput')}</h2>
               <p className="text-xs text-muted">
                 I'm not sure about {reviewItems.length} file{reviewItems.length > 1 ? 's' : ''}. Help me classify {reviewItems.length > 1 ? 'them' : 'it'} correctly.
               </p>
@@ -381,6 +379,7 @@ export default function ScannerPage() {
               key={item.filePath}
               item={item}
               onResolve={handleResolveReview}
+              t={t}
             />
           ))}
         </div>
@@ -407,7 +406,7 @@ export default function ScannerPage() {
           <svg className="w-12 h-12 text-faint mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
           </svg>
-          <p className="text-muted mt-4 text-lg">Select folders and click "Scan & Classify" to discover your files</p>
+          <p className="text-muted mt-4 text-lg">{t('scanner.subtitle')}</p>
         </div>
       )}
     </div>
@@ -415,7 +414,7 @@ export default function ScannerPage() {
 }
 
 /* ── Review Card — AI communicates with the user ── */
-function ReviewCard({ item, onResolve }: { item: ReviewItem; onResolve: (filePath: string, slug: string) => void }) {
+function ReviewCard({ item, onResolve, t }: { item: ReviewItem; onResolve: (filePath: string, slug: string) => void; t: (key: string, vars?: Record<string, string | number>) => string }) {
   const [showAllCategories, setShowAllCategories] = useState(false);
 
   const allCategorySlugs = ['clients', 'projects', 'medicine', 'design', 'learning', 'documents', 'media', 'tools', 'archive'];
@@ -454,7 +453,7 @@ function ReviewCard({ item, onResolve }: { item: ReviewItem; onResolve: (filePat
 
       {/* Category choices */}
       <div className="p-4">
-        <p className="text-xs text-muted mb-3 font-medium uppercase tracking-wider">Choose a category:</p>
+        <p className="text-xs text-muted mb-3 font-medium uppercase tracking-wider">{t('scanner.chooseCategory')}</p>
 
         {/* Best guess + alternatives */}
         <div className="flex flex-wrap gap-2 mb-3">
@@ -470,7 +469,7 @@ function ReviewCard({ item, onResolve }: { item: ReviewItem; onResolve: (filePat
           >
             {CATEGORY_ICONS[item.bestGuess] || FALLBACK_ICON}
             <span>{CATEGORY_NAMES[item.bestGuess] || item.bestGuess}</span>
-            <span className="text-xs opacity-60">(best guess)</span>
+            <span className="text-xs opacity-60">{t('scanner.bestGuess')}</span>
           </button>
 
           {/* Alternatives */}
@@ -493,7 +492,7 @@ function ReviewCard({ item, onResolve }: { item: ReviewItem; onResolve: (filePat
             onClick={() => setShowAllCategories(true)}
             className="text-xs text-faint hover:text-muted cursor-pointer"
           >
-            Show all categories...
+            {t('scanner.showAllCategories')}
           </button>
         ) : (
           <div className="flex flex-wrap gap-1.5 pt-1 border-t border-edge/30">

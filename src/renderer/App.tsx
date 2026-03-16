@@ -16,23 +16,36 @@ type Page = 'dashboard' | 'storage' | 'scanner' | 'organizer' | 'search' | 'sett
 // Render the search overlay if loaded via #/search-overlay hash route
 const isSearchOverlay = window.location.hash === '#/search-overlay';
 
-class PageErrorBoundary extends Component<{ children: ReactNode; page: string }, { hasError: boolean }> {
-  state = { hasError: false };
-  static getDerivedStateFromError() { return { hasError: true }; }
+class PageErrorBoundary extends Component<{ children: ReactNode; page: string }, { hasError: boolean; error: Error | null }> {
+  state: { hasError: boolean; error: Error | null } = { hasError: false, error: null };
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
   componentDidUpdate(prevProps: { page: string }) {
-    if (prevProps.page !== this.props.page) this.setState({ hasError: false });
+    if (prevProps.page !== this.props.page) this.setState({ hasError: false, error: null });
   }
   render() {
     if (this.state.hasError) {
+      const isElectronMissing = !window.api;
       return (
         <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-faint/30 mb-4">
             <circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><circle cx="12" cy="16" r="0.5" fill="currentColor"/>
           </svg>
           <p className="text-muted text-lg mb-1" style={{ fontFamily: 'Sora, sans-serif' }}>
-            This page requires the Electron app
+            {isElectronMissing ? 'This page requires the Electron app' : 'Something went wrong'}
           </p>
-          <p className="text-faint text-sm">Run with <code className="font-mono text-accent/60 px-1.5 py-0.5 rounded bg-accent/5">npm run dev</code> then <code className="font-mono text-accent/60 px-1.5 py-0.5 rounded bg-accent/5">npm start</code></p>
+          {isElectronMissing ? (
+            <p className="text-faint text-sm">Run with <code className="font-mono text-accent/60 px-1.5 py-0.5 rounded bg-accent/5">npm run dev</code> then <code className="font-mono text-accent/60 px-1.5 py-0.5 rounded bg-accent/5">npm start</code></p>
+          ) : (
+            <>
+              <p className="text-faint text-sm mb-3 max-w-md text-center font-mono">{this.state.error?.message}</p>
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="px-4 py-2 btn-primary rounded-xl text-white text-sm font-medium cursor-pointer"
+              >
+                Retry
+              </button>
+            </>
+          )}
         </div>
       );
     }

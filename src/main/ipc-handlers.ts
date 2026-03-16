@@ -10,7 +10,7 @@ import { runStorageScan, abortScan, isScanning } from './modules/storage-analyze
 import { cleanupApprovedItems, getDriveInfo } from './modules/storage-analyzer/cleaner';
 import { runClassification, isClassifying, abortClassification, getClassifiedFiles, getPendingReviewItems, resolveReviewItem } from './modules/file-classifier/classifier';
 import { setGeminiApiKey, hasGeminiApiKey } from './modules/file-classifier/gemini-client';
-import { generateMovePlan, checkDiskSpace } from './modules/auto-organizer/organizer';
+import { generateMovePlan, checkDiskSpace, analyzePlan } from './modules/auto-organizer/organizer';
 import { executePlan } from './modules/auto-organizer/move-executor';
 import { undoMove, undoSession, getUndoHistory, getSessionDetails } from './modules/auto-organizer/undo-manager';
 import { MovePlanItem } from '../shared/types';
@@ -245,6 +245,10 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.ORGANIZER_SESSION_DETAILS, (_event, sessionId: string) => {
     return getSessionDetails(sessionId);
+  });
+
+  ipcMain.handle(IpcChannels.ORGANIZER_ANALYZE_PLAN, async (_event, planItems: MovePlanItem[]) => {
+    return await analyzePlan(planItems);
   });
 
   // ── Quick Search ───────────────────────────────

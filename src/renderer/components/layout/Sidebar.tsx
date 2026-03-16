@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useThemeStore } from '../../stores/theme-store';
+import { useI18n } from '../../i18n';
 
 type Page = 'dashboard' | 'storage' | 'scanner' | 'organizer' | 'search' | 'settings';
 
@@ -14,32 +15,38 @@ interface NavItem {
   icon: React.ReactNode;
 }
 
-const mainNav: NavItem[] = [
+interface NavDef {
+  id: Page;
+  i18nKey: string;
+  icon: React.ReactNode;
+}
+
+const mainNavDefs: NavDef[] = [
   {
-    id: 'dashboard', label: 'Dashboard',
+    id: 'dashboard', i18nKey: 'nav.dashboard',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
   },
   {
-    id: 'storage', label: 'Storage',
+    id: 'storage', i18nKey: 'nav.storage',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
   },
   {
-    id: 'scanner', label: 'Scanner',
+    id: 'scanner', i18nKey: 'nav.scanner',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>,
   },
   {
-    id: 'organizer', label: 'Organize',
+    id: 'organizer', i18nKey: 'nav.organize',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
   },
   {
-    id: 'search', label: 'Search',
+    id: 'search', i18nKey: 'nav.search',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
   },
 ];
 
-const bottomNav: NavItem[] = [
+const bottomNavDefs: NavDef[] = [
   {
-    id: 'settings', label: 'Settings',
+    id: 'settings', i18nKey: 'nav.settings',
     icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
   },
 ];
@@ -47,6 +54,7 @@ const bottomNav: NavItem[] = [
 export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
   const [folderCount, setFolderCount] = useState<number | null>(null);
   const { theme, toggleTheme } = useThemeStore();
+  const { t } = useI18n();
 
   useEffect(() => {
     window.api?.invoke('watcher:count').then((c) => setFolderCount(c as number)).catch(() => {});
@@ -59,16 +67,16 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
         style={{ background: 'var(--t-sidebar-edge)' }} />
 
       <div className="flex-1 py-4 px-3 space-y-0.5" role="menubar" aria-label="Main menu">
-        <div className="section-label px-3 mb-3" aria-hidden="true">Navigation</div>
-        {mainNav.map((item) => (
-          <NavButton key={item.id} item={item} isActive={currentPage === item.id} onClick={() => onNavigate(item.id)} />
+        <div className="section-label px-3 mb-3" aria-hidden="true">{t('nav.navigation')}</div>
+        {mainNavDefs.map((def) => (
+          <NavButton key={def.id} item={{ id: def.id, label: t(def.i18nKey), icon: def.icon }} isActive={currentPage === def.id} onClick={() => onNavigate(def.id)} />
         ))}
       </div>
 
       <div className="py-4 px-3 space-y-0.5">
         <div className="h-px mx-3 mb-3" style={{ background: 'linear-gradient(90deg, transparent, rgba(124,92,252,0.1), transparent)' }} />
-        {bottomNav.map((item) => (
-          <NavButton key={item.id} item={item} isActive={currentPage === item.id} onClick={() => onNavigate(item.id)} />
+        {bottomNavDefs.map((def) => (
+          <NavButton key={def.id} item={{ id: def.id, label: t(def.i18nKey), icon: def.icon }} isActive={currentPage === def.id} onClick={() => onNavigate(def.id)} />
         ))}
 
         {/* Theme toggle */}
@@ -100,14 +108,18 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
               </svg>
             )}
           </span>
-          {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          {theme === 'dark' ? t('nav.lightMode') : t('nav.darkMode')}
         </button>
 
         {folderCount !== null && folderCount > 0 && (
           <div className="px-3 pt-4 pb-1">
             <div className="flex items-center gap-2.5 text-[11px] text-faint/70">
               <span className="w-[6px] h-[6px] rounded-full bg-success animate-pulse-dot" />
-              <span style={{ fontFamily: 'DM Sans, sans-serif' }}>Watching {folderCount} folder{folderCount !== 1 ? 's' : ''}</span>
+              <span style={{ fontFamily: 'DM Sans, sans-serif' }}>
+                {folderCount === 1
+                  ? t('nav.watchingFolders', { count: folderCount })
+                  : t('nav.watchingFoldersPlural', { count: folderCount })}
+              </span>
             </div>
           </div>
         )}

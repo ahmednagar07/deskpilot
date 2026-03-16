@@ -1,7 +1,20 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useOrganizerStore, UndoSession } from '../../stores/organizer-store';
 import { useToastStore } from '../../stores/toast-store';
+import { useI18n } from '../../i18n';
 import { MovePlanItem, Category } from '../../../shared/types';
+
+interface PlanAnalysis {
+  totalFiles: number;
+  totalBytes: number;
+  categoryBreakdown: Array<{ category: string; count: number; bytes: number }>;
+  sourceDrives: Array<{ drive: string; fileCount: number; totalBytes: number; freeBytes: number; isCrossDrive: boolean }>;
+  destDrive: { drive: string; freeBytes: number };
+  crossDriveCount: number;
+  sameDriveCount: number;
+  spaceOk: boolean;
+  spaceNeeded: number;
+}
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -20,12 +33,14 @@ function shortPath(p: string): string {
 /** Build a new destPath for a file when it's reclassified to a different category */
 function buildDestPath(item: MovePlanItem, targetPath: string): string {
   const fileName = item.suggestedName || item.currentName;
-  // Normalise slashes and join with forward slash (consistent with rest of codebase)
   const base = targetPath.replace(/[\\/]+$/, '');
   return `${base}/${fileName}`;
 }
 
+const MAX_BATCH_APPROVE = 100;
+
 export default function OrganizerPage() {
+  const { t } = useI18n();
   const {
     plan, isGenerating, isExecuting, undoHistory,
     setPlan, setIsGenerating, setIsExecuting, setUndoHistory,
@@ -35,6 +50,10 @@ export default function OrganizerPage() {
   const addToast = useToastStore(s => s.addToast);
   const [activeTab, setActiveTab] = useState<'plan' | 'history'>('plan');
   const [executionResult, setExecutionResult] = useState<{ succeeded: number; failed: number } | null>(null);
+
+  // Safety: plan analysis + confirmation
+  const [analysis, setAnalysis] = useState<PlanAnalysis | null>(null);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   // Drag & drop state
   const [draggingFileId, setDraggingFileId] = useState<number | null>(null);
@@ -74,18 +93,41 @@ export default function OrganizerPage() {
   const handleGeneratePlan = async () => {
     setIsGenerating(true);
     setExecutionResult(null);
+    setAnalysis(null);
     try {
       const result = await window.api.invoke('organizer:generate-plan') as MovePlanItem[];
       setPlan(result);
+
+      // Auto-analyze the plan
+      if (result.length > 0) {
+        try {
+          const planAnalysis = await window.api.invoke('organizer:analyze-plan', result) as PlanAnalysis;
+          setAnalysis(planAnalysis);
+        } catch (err) {
+          console.error('Plan analysis failed:', err);
+        }
+      }
     } catch (err) {
       console.error('Failed to generate plan:', err);
-      addToast('error', 'Failed to generate move plan. Check logs for details.');
+      addToast('error', t('toast.planFailed'));
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleExecute = async () => {
+  const handleExecuteRequest = () => {
+    const approved = plan.filter(item => item.approved);
+    if (approved.length === 0) return;
+    // Always show confirmation dialog before moving files
+    setShowConfirm(true);
+    // Re-analyze with only approved items
+    window.api.invoke('organizer:analyze-plan', approved)
+      .then((result) => setAnalysis(result as PlanAnalysis))
+      .catch(console.error);
+  };
+
+  const handleExecuteConfirmed = async () => {
+    setShowConfirm(false);
     const approved = plan.filter(item => item.approved);
     if (approved.length === 0) return;
 
@@ -98,26 +140,27 @@ export default function OrganizerPage() {
 
       if (result.error) {
         console.error('Execute error:', result.error);
-        addToast('error', `Move failed: ${result.error}`);
+        addToast('error', `${t('toast.moveFailed')}: ${result.error}`);
         return;
       }
 
       setExecutionResult({ succeeded: result.succeeded, failed: result.failed });
 
       if (result.failed > 0) {
-        addToast('warning', `Moved ${result.succeeded} files, ${result.failed} failed`);
+        addToast('warning', `${result.succeeded} ${t('common.files')} moved, ${result.failed} failed`);
       } else {
-        addToast('success', `Successfully moved ${result.succeeded} files`);
+        addToast('success', t('organizer.moveFiles', { count: result.succeeded }));
       }
 
       // Remove succeeded items from plan
       const failedPaths = new Set(result.errors?.map(e => e.path) || []);
       setPlan(plan.filter(item => failedPaths.has(item.currentPath)));
+      setAnalysis(null);
 
       await loadHistory();
     } catch (err) {
       console.error('Execute failed:', err);
-      addToast('error', 'File move execution failed');
+      addToast('error', t('toast.moveFailed'));
     } finally {
       setIsExecuting(false);
     }
@@ -127,11 +170,28 @@ export default function OrganizerPage() {
     try {
       await window.api.invoke('organizer:undo-batch', sessionId);
       await loadHistory();
-      addToast('success', 'Undo completed successfully');
+      addToast('success', t('toast.undoComplete'));
     } catch (err) {
       console.error('Undo failed:', err);
-      addToast('error', 'Undo failed');
+      addToast('error', t('toast.undoFailed'));
     }
+  };
+
+  // Guard: Approve All only for small batches
+  const handleApproveAll = () => {
+    if (plan.length > MAX_BATCH_APPROVE) {
+      addToast('warning', t('organizer.batchTooLarge', { max: MAX_BATCH_APPROVE }));
+      return;
+    }
+    approveAll();
+  };
+
+  // Approve all files in a specific category
+  const handleApproveCategory = (category: string) => {
+    const updated = plan.map(item =>
+      item.category === category ? { ...item, approved: true } : item
+    );
+    setPlan(updated);
   };
 
   // --- Drag & Drop: reclassify a file into a new category ---
@@ -143,7 +203,7 @@ export default function OrganizerPage() {
 
     const updated = plan.map(item => {
       if (item.fileId !== draggingFileId) return item;
-      if (item.category === categoryName) return item; // no-op
+      if (item.category === categoryName) return item;
       return {
         ...item,
         category: categoryName,
@@ -154,8 +214,8 @@ export default function OrganizerPage() {
     setPlan(updated);
     setDraggingFileId(null);
     setIsDragging(false);
-    addToast('success', `Moved file to "${categoryName}"`);
-  }, [draggingFileId, allCategories, plan, setPlan, addToast]);
+    addToast('success', t('organizer.movedToCategory', { category: categoryName }));
+  }, [draggingFileId, allCategories, plan, setPlan, addToast, t]);
 
   // --- Batch Rename ---
   const handleBatchRenamePreview = async () => {
@@ -200,17 +260,15 @@ export default function OrganizerPage() {
 
   const approvedCount = useMemo(() => plan.filter(p => p.approved).length, [plan]);
 
-  // Group plan by category — memoized to avoid O(n) re-grouping on every render
+  // Group plan by category
   const grouped = useMemo(() => plan.reduce<Record<string, MovePlanItem[]>>((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
   }, {}), [plan]);
 
-  // Categories present in the plan
   const categoriesInPlan = useMemo(() => new Set(Object.keys(grouped)), [grouped]);
 
-  // Categories NOT in the current plan (for the floating dock)
   const dockCategories = useMemo(
     () => allCategories.filter(c => !categoriesInPlan.has(c.name)),
     [allCategories, categoriesInPlan]
@@ -221,17 +279,15 @@ export default function OrganizerPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-[Sora]">Auto-Organizer</h1>
-          <p className="text-muted text-sm mt-1">
-            Review the move plan, approve changes, then execute. Every move can be undone.
-          </p>
+          <h1 className="text-2xl font-bold text-foreground font-[Sora]">{t('organizer.title')}</h1>
+          <p className="text-muted text-sm mt-1">{t('organizer.subtitle')}</p>
         </div>
         <button
           onClick={handleGeneratePlan}
           disabled={isGenerating}
           className="px-5 py-2.5 btn-primary rounded-xl disabled:opacity-50 text-white font-medium text-sm transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
-          {isGenerating ? 'Generating...' : 'Generate Plan'}
+          {isGenerating ? t('organizer.generating') : t('organizer.generatePlan')}
         </button>
       </div>
 
@@ -240,23 +296,28 @@ export default function OrganizerPage() {
         <button
           onClick={() => setActiveTab('plan')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'plan' ? 'border-[#7C5CFC] text-[#9B7FFF]' : 'border-transparent text-faint hover:text-muted'
+            activeTab === 'plan' ? 'border-[var(--t-accent)] text-[var(--t-accent)]' : 'border-transparent text-faint hover:text-muted'
           }`}
         >
-          Move Plan {plan.length > 0 && `(${plan.length})`}
+          {t('organizer.movePlan')} {plan.length > 0 && `(${plan.length})`}
         </button>
         <button
           onClick={() => setActiveTab('history')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors cursor-pointer ${
-            activeTab === 'history' ? 'border-[#7C5CFC] text-[#9B7FFF]' : 'border-transparent text-faint hover:text-muted'
+            activeTab === 'history' ? 'border-[var(--t-accent)] text-[var(--t-accent)]' : 'border-transparent text-faint hover:text-muted'
           }`}
         >
-          Undo History {undoHistory.length > 0 && `(${undoHistory.length})`}
+          {t('organizer.undoHistory')} {undoHistory.length > 0 && `(${undoHistory.length})`}
         </button>
       </div>
 
       {activeTab === 'plan' && (
         <>
+          {/* Plan Summary Card */}
+          {analysis && plan.length > 0 && (
+            <PlanSummaryCard analysis={analysis} t={t} />
+          )}
+
           {/* Execution result */}
           {executionResult && (
             <div className={`p-3 rounded-xl border text-sm ${
@@ -264,7 +325,7 @@ export default function OrganizerPage() {
                 ? 'bg-success/10 border-success/30 text-success'
                 : 'bg-warning/10 border-warning/30 text-warning'
             }`}>
-              Moved {executionResult.succeeded} files successfully.
+              {t('organizer.filesMoved', { count: executionResult.succeeded })}.
               {executionResult.failed > 0 && ` ${executionResult.failed} failed.`}
             </div>
           )}
@@ -274,29 +335,33 @@ export default function OrganizerPage() {
             <div className="flex items-center justify-between v-card p-4">
               <div className="flex items-center gap-4">
                 <span className="text-sm text-muted">
-                  <span className="text-foreground font-semibold">{plan.length}</span> files to organize
+                  <span className="text-foreground font-semibold">{plan.length}</span> {t('organizer.filesToOrganize')}
                 </span>
                 <span className="text-sm text-muted">
-                  <span className="text-[#9B7FFF] font-semibold">{approvedCount}</span> approved
+                  <span className="text-[var(--t-accent)] font-semibold">{approvedCount}</span> {t('organizer.approved')}
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <button onClick={handleBatchRenamePreview} className="text-xs text-[#22D3EE] hover:text-[#06B6D4] cursor-pointer">
-                  Clean Names
-                </button>
-                <button onClick={approveAll} className="text-xs text-[#9B7FFF] hover:text-[#7C5CFC] cursor-pointer">
-                  Approve All
-                </button>
-                <button onClick={deselectAll} className="text-xs text-faint hover:text-muted cursor-pointer">
-                  Clear
+                  {t('organizer.cleanNames')}
                 </button>
                 <button
-                  onClick={handleExecute}
+                  onClick={handleApproveAll}
+                  className="text-xs text-[var(--t-accent)] hover:opacity-80 cursor-pointer"
+                  title={plan.length > MAX_BATCH_APPROVE ? t('organizer.batchTooLarge', { max: MAX_BATCH_APPROVE }) : ''}
+                >
+                  {t('organizer.approveAll')} {plan.length > MAX_BATCH_APPROVE && `(max ${MAX_BATCH_APPROVE})`}
+                </button>
+                <button onClick={deselectAll} className="text-xs text-faint hover:text-muted cursor-pointer">
+                  {t('organizer.clear')}
+                </button>
+                <button
+                  onClick={handleExecuteRequest}
                   disabled={approvedCount === 0 || isExecuting}
                   className="px-4 py-2 disabled:opacity-50 text-white rounded-xl text-sm font-medium transition-all cursor-pointer disabled:cursor-not-allowed hover:brightness-110"
                   style={{ background: 'linear-gradient(135deg, #2DD4A8, #1A9F7C)' }}
                 >
-                  {isExecuting ? 'Moving...' : `Move ${approvedCount} Files`}
+                  {isExecuting ? t('organizer.moving') : t('organizer.moveFiles', { count: approvedCount })}
                 </button>
               </div>
             </div>
@@ -304,9 +369,7 @@ export default function OrganizerPage() {
 
           {/* Drag hint */}
           {plan.length > 0 && !isDragging && (
-            <p className="text-xs text-faint text-center">
-              Tip: Drag files onto category headers or the dock below to reclassify them.
-            </p>
+            <p className="text-xs text-faint text-center">{t('organizer.dragHint')}</p>
           )}
 
           {/* Grouped plan items */}
@@ -316,10 +379,13 @@ export default function OrganizerPage() {
               category={category}
               items={items}
               onToggle={toggleApproval}
+              onApproveCategory={handleApproveCategory}
               draggingFileId={draggingFileId}
               onDragStart={(fileId) => { setDraggingFileId(fileId); setIsDragging(true); }}
               onDragEnd={() => { setDraggingFileId(null); setIsDragging(false); }}
               onDropOnCategory={handleDropOnCategory}
+              t={t}
+              categoryBytes={analysis?.categoryBreakdown.find(c => c.category === category)?.bytes}
             />
           ))}
 
@@ -329,12 +395,8 @@ export default function OrganizerPage() {
               <svg className="w-14 h-14 mx-auto text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-              <p className="text-muted mt-4 text-lg">
-                Click "Generate Plan" to create a move plan from classified files
-              </p>
-              <p className="text-faint mt-2 text-sm">
-                Make sure you've scanned files first in the Scanner tab
-              </p>
+              <p className="text-muted mt-4 text-lg">{t('organizer.generateHint')}</p>
+              <p className="text-faint mt-2 text-sm">{t('organizer.scanFirst')}</p>
             </div>
           )}
         </>
@@ -347,17 +409,14 @@ export default function OrganizerPage() {
               <svg className="w-14 h-14 mx-auto text-faint" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <p className="text-muted mt-4 text-lg">No move history yet</p>
+              <p className="text-muted mt-4 text-lg">{t('organizer.noHistory')}</p>
             </div>
           ) : (
             undoHistory.map((session) => (
-              <div
-                key={session.session_id}
-                className="v-card p-4 flex items-center justify-between"
-              >
+              <div key={session.session_id} className="v-card p-4 flex items-center justify-between">
                 <div>
                   <span className="text-sm text-foreground font-medium">
-                    {session.count} files moved
+                    {t('organizer.filesMoved', { count: session.count })}
                   </span>
                   <span className="text-xs text-faint ml-3">
                     {new Date(session.executed_at).toLocaleString()}
@@ -367,7 +426,7 @@ export default function OrganizerPage() {
                   onClick={() => handleUndoSession(session.session_id)}
                   className="px-3 py-1.5 border border-edge text-muted rounded-xl text-xs font-medium cursor-pointer hover:bg-hover/50 hover:text-foreground transition-colors"
                 >
-                  Undo Session
+                  {t('organizer.undoSession')}
                 </button>
               </div>
             ))
@@ -380,8 +439,8 @@ export default function OrganizerPage() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="v-card max-w-lg w-full max-h-[70vh] flex flex-col">
             <div className="p-5 border-b border-edge">
-              <h3 className="text-lg font-semibold text-foreground font-[Sora]">Clean Filenames</h3>
-              <p className="text-xs text-faint mt-1">{renamePreview.length} files will be renamed</p>
+              <h3 className="text-lg font-semibold text-foreground font-[Sora]">{t('organizer.cleanFilenames')}</h3>
+              <p className="text-xs text-faint mt-1">{t('organizer.filesWillBeRenamed', { count: renamePreview.length })}</p>
             </div>
             <div className="flex-1 overflow-y-auto p-5 space-y-2">
               {renamePreview.map((item) => (
@@ -395,42 +454,202 @@ export default function OrganizerPage() {
               ))}
             </div>
             <div className="p-4 border-t border-edge flex justify-end gap-3">
-              <button
-                onClick={() => setRenamePreview(null)}
-                className="px-4 py-2 text-sm text-faint hover:text-muted cursor-pointer"
-              >
-                Cancel
+              <button onClick={() => setRenamePreview(null)} className="px-4 py-2 text-sm text-faint hover:text-muted cursor-pointer">
+                {t('common.cancel')}
               </button>
               <button
                 onClick={handleBatchRenameExecute}
                 disabled={isRenaming}
                 className="px-5 py-2 btn-primary rounded-xl text-sm font-medium cursor-pointer disabled:opacity-50"
               >
-                {isRenaming ? 'Renaming...' : `Rename ${renamePreview.length} Files`}
+                {isRenaming ? t('organizer.renaming') : t('organizer.renameFiles', { count: renamePreview.length })}
               </button>
             </div>
           </div>
         </div>
       )}
 
+      {/* Confirmation Dialog */}
+      {showConfirm && (
+        <ConfirmMoveDialog
+          analysis={analysis}
+          approvedCount={approvedCount}
+          onConfirm={handleExecuteConfirmed}
+          onCancel={() => setShowConfirm(false)}
+          t={t}
+        />
+      )}
+
       {/* Floating category dock -- visible only when dragging */}
       {isDragging && (
         <div
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-[#7C5CFC]/40 bg-[#1A1A2E]/95 backdrop-blur-lg shadow-[0_0_30px_rgba(124,92,252,0.25)]"
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex flex-wrap items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-[var(--t-accent)]/40 bg-[var(--t-surface)]/95 backdrop-blur-lg shadow-lg"
           style={{ maxWidth: '90vw' }}
         >
           <span className="text-[10px] uppercase tracking-widest text-faint mr-2 select-none">
-            Drop onto category
+            {t('organizer.dropOntoCategory')}
           </span>
           {dockCategories.map(cat => (
-            <CategoryDockPill
-              key={cat.id}
-              category={cat}
-              onDrop={handleDropOnCategory}
-            />
+            <CategoryDockPill key={cat.id} category={cat} onDrop={handleDropOnCategory} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Plan Summary Card ────────────────────────────────────────────────────────
+
+function PlanSummaryCard({ analysis, t }: { analysis: PlanAnalysis; t: (key: string, vars?: Record<string, string | number>) => string }) {
+  return (
+    <div className="v-card p-5 space-y-4">
+      <h3 className="section-label">{t('organizer.planSummary')}</h3>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div>
+          <div className="text-2xl font-bold text-foreground">{analysis.totalFiles.toLocaleString()}</div>
+          <div className="text-xs text-faint">{t('organizer.sourceFiles')}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-foreground">{formatBytes(analysis.totalBytes)}</div>
+          <div className="text-xs text-faint">{t('dashboard.totalSize')}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-foreground">{analysis.destDrive.drive}</div>
+          <div className="text-xs text-faint">{t('organizer.destination')} ({t('organizer.spaceAvailable', { available: formatBytes(analysis.destDrive.freeBytes) })})</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-foreground">{analysis.categoryBreakdown.length}</div>
+          <div className="text-xs text-faint">{t('dashboard.categories')}</div>
+        </div>
+      </div>
+
+      {/* Cross-drive warning */}
+      {analysis.crossDriveCount > 0 && (
+        <div className={`p-3 rounded-xl border text-sm ${
+          analysis.spaceOk
+            ? 'bg-warning/10 border-warning/30 text-warning'
+            : 'bg-danger/10 border-danger/30 text-danger'
+        }`}>
+          {analysis.spaceOk
+            ? t('organizer.crossDriveWarning', { size: formatBytes(analysis.spaceNeeded), drive: analysis.destDrive.drive })
+            : t('organizer.notEnoughSpace', {
+                needed: formatBytes(analysis.spaceNeeded),
+                available: formatBytes(analysis.destDrive.freeBytes),
+                drive: analysis.destDrive.drive,
+              })
+          }
+        </div>
+      )}
+
+      {/* Drive breakdown */}
+      {analysis.sourceDrives.length > 1 && (
+        <div>
+          <div className="text-xs text-faint uppercase tracking-wider mb-2">{t('organizer.driveAnalysis')}</div>
+          <div className="grid gap-2">
+            {analysis.sourceDrives.map(drive => (
+              <div key={drive.drive} className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-surface/50">
+                <div className="flex items-center gap-2">
+                  <span className="font-mono text-foreground font-medium">{drive.drive}</span>
+                  <span className="text-faint">{drive.fileCount} {t('common.files')}</span>
+                  <span className="text-faint">({formatBytes(drive.totalBytes)})</span>
+                </div>
+                {drive.isCrossDrive && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-warning/20 text-warning">
+                    {t('organizer.crossDriveMoves')}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Confirmation Dialog ──────────────────────────────────────────────────────
+
+function ConfirmMoveDialog({
+  analysis,
+  approvedCount,
+  onConfirm,
+  onCancel,
+  t,
+}: {
+  analysis: PlanAnalysis | null;
+  approvedCount: number;
+  onConfirm: () => void;
+  onCancel: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const canProceed = analysis ? analysis.spaceOk : true;
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="v-card max-w-lg w-full max-h-[80vh] flex flex-col">
+        <div className="p-5 border-b border-edge">
+          <h3 className="text-lg font-semibold text-foreground font-[Sora]">{t('organizer.confirmMove')}</h3>
+          <p className="text-sm text-muted mt-1">{t('organizer.confirmMoveDesc', { count: approvedCount })}</p>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {analysis && (
+            <>
+              {/* Category breakdown */}
+              <div>
+                <div className="text-xs text-faint uppercase tracking-wider mb-2">{t('organizer.categoryBreakdown')}</div>
+                <div className="space-y-1.5">
+                  {analysis.categoryBreakdown.map(cat => (
+                    <div key={cat.category} className="flex items-center justify-between text-sm">
+                      <span className="text-foreground">{cat.category}</span>
+                      <span className="text-faint">{cat.count} {t('common.files')} ({formatBytes(cat.bytes)})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Destination */}
+              <div className="flex items-center justify-between text-sm p-3 rounded-lg bg-surface/50">
+                <span className="text-faint">{t('organizer.destination')}</span>
+                <span className="font-mono text-foreground">{analysis.destDrive.drive} — {formatBytes(analysis.destDrive.freeBytes)} {t('storage.free')}</span>
+              </div>
+
+              {/* Cross-drive warning */}
+              {analysis.crossDriveCount > 0 && (
+                <div className={`p-3 rounded-xl border text-sm ${
+                  analysis.spaceOk
+                    ? 'bg-warning/10 border-warning/30 text-warning'
+                    : 'bg-danger/10 border-danger/30 text-danger'
+                }`}>
+                  <div className="font-medium mb-1">{t('organizer.crossDriveMoves')}: {analysis.crossDriveCount} {t('common.files')}</div>
+                  {!analysis.spaceOk && (
+                    <div>{t('organizer.notEnoughSpace', {
+                      needed: formatBytes(analysis.spaceNeeded),
+                      available: formatBytes(analysis.destDrive.freeBytes),
+                      drive: analysis.destDrive.drive,
+                    })}</div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-edge flex justify-end gap-3">
+          <button onClick={onCancel} className="px-4 py-2 text-sm text-faint hover:text-muted cursor-pointer">
+            {t('common.cancel')}
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={!canProceed}
+            className="px-5 py-2 rounded-xl text-sm font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed text-white transition-all hover:brightness-110"
+            style={{ background: canProceed ? 'linear-gradient(135deg, #2DD4A8, #1A9F7C)' : '#666' }}
+          >
+            {t('organizer.proceedMove')}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -459,7 +678,7 @@ function CategoryDockPill({
       className={`
         px-3 py-1.5 rounded-full text-xs font-medium select-none transition-all duration-150 cursor-default
         ${over
-          ? 'bg-[#7C5CFC]/30 text-white ring-2 ring-[#7C5CFC] scale-110'
+          ? 'bg-[var(--t-accent)]/30 text-white ring-2 ring-[var(--t-accent)] scale-110'
           : 'bg-surface/60 text-muted hover:bg-surface'
         }
       `}
@@ -478,18 +697,24 @@ const PlanGroup = React.memo(function PlanGroup({
   category,
   items,
   onToggle,
+  onApproveCategory,
   draggingFileId,
   onDragStart,
   onDragEnd,
   onDropOnCategory,
+  t,
+  categoryBytes,
 }: {
   category: string;
   items: MovePlanItem[];
   onToggle: (fileId: number) => void;
+  onApproveCategory: (category: string) => void;
   draggingFileId: number | null;
   onDragStart: (fileId: number) => void;
   onDragEnd: () => void;
   onDropOnCategory: (categoryName: string) => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  categoryBytes?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [visibleCount, setVisibleCount] = useState(ITEMS_PER_PAGE);
@@ -501,50 +726,50 @@ const PlanGroup = React.memo(function PlanGroup({
   return (
     <div
       className={`v-card overflow-hidden transition-shadow duration-200 ${
-        dropHover ? 'ring-2 ring-[#7C5CFC] shadow-[0_0_16px_rgba(124,92,252,0.35)]' : ''
+        dropHover ? 'ring-2 ring-[var(--t-accent)] shadow-lg' : ''
       }`}
     >
       {/* Category header -- also a drop target */}
       <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          setDropHover(true);
-        }}
-        onDragEnter={(e) => {
-          e.preventDefault();
-          setDropHover(true);
-        }}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDropHover(true); }}
+        onDragEnter={(e) => { e.preventDefault(); setDropHover(true); }}
         onDragLeave={() => setDropHover(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDropHover(false);
-          onDropOnCategory(category);
-        }}
+        onDrop={(e) => { e.preventDefault(); setDropHover(false); onDropOnCategory(category); }}
       >
         <button
           onClick={() => setExpanded(!expanded)}
           className={`w-full flex items-center justify-between p-4 hover:bg-hover/50 transition-colors cursor-pointer ${
-            dropHover ? 'bg-[#7C5CFC]/10' : ''
+            dropHover ? 'bg-[var(--t-accent)]/10' : ''
           }`}
         >
           <div className="flex items-center gap-3">
             <span className="section-label">{category}</span>
             <span className="text-xs text-faint bg-surface px-2 py-0.5 rounded-full">
-              {items.length} files
+              {t('organizer.filesInCategory', { count: items.length })}
             </span>
+            {categoryBytes !== undefined && (
+              <span className="text-xs text-faint">{formatBytes(categoryBytes)}</span>
+            )}
             {dropHover && (
-              <span className="text-xs text-[#9B7FFF] font-medium animate-pulse">
-                Drop here
+              <span className="text-xs text-[var(--t-accent)] font-medium animate-pulse">
+                {t('organizer.dropHere')}
               </span>
             )}
           </div>
-          <svg
-            className={`w-4 h-4 text-faint transition-transform ${expanded ? 'rotate-180' : ''}`}
-            fill="none" stroke="currentColor" viewBox="0 0 24 24"
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={(e) => { e.stopPropagation(); onApproveCategory(category); }}
+              className="text-xs text-[var(--t-accent)] hover:opacity-80 px-2 py-1 rounded cursor-pointer"
+            >
+              {t('organizer.approveCategory')}
+            </button>
+            <svg
+              className={`w-4 h-4 text-faint transition-transform ${expanded ? 'rotate-180' : ''}`}
+              fill="none" stroke="currentColor" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
         </button>
       </div>
 
@@ -568,12 +793,7 @@ const PlanGroup = React.memo(function PlanGroup({
                 }`}
                 style={{ cursor: 'grab' }}
               >
-                {/* Drag handle indicator */}
-                <svg
-                  className="w-4 h-4 text-faint/50 mt-0.5 shrink-0"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-4 h-4 text-faint/50 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
                   <circle cx="9" cy="6" r="1.5" />
                   <circle cx="15" cy="6" r="1.5" />
                   <circle cx="9" cy="12" r="1.5" />
@@ -590,22 +810,22 @@ const PlanGroup = React.memo(function PlanGroup({
                     type="checkbox"
                     checked={item.approved}
                     onChange={() => onToggle(item.fileId)}
-                    className="w-4 h-4 rounded accent-[#7C5CFC] mt-0.5"
+                    className="w-4 h-4 rounded accent-[var(--t-accent)] mt-0.5"
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="text-sm text-foreground truncate">{item.currentName}</span>
                       {item.suggestedName && (
-                        <span className="text-xs text-[#9B7FFF]">
+                        <span className="text-xs text-[var(--t-accent)]">
                           &rarr; {item.suggestedName}
                         </span>
                       )}
                     </div>
                     <div className="text-xs text-faint mt-0.5 truncate font-mono" title={item.currentPath}>
-                      From: {shortPath(item.currentPath)}
+                      {t('common.from')}: {shortPath(item.currentPath)}
                     </div>
                     <div className="text-xs text-success mt-0.5 truncate font-mono" title={item.destPath}>
-                      To: {shortPath(item.destPath)}
+                      {t('common.to')}: {shortPath(item.destPath)}
                     </div>
                   </div>
                 </label>
@@ -615,9 +835,9 @@ const PlanGroup = React.memo(function PlanGroup({
           {hasMore && (
             <button
               onClick={() => setVisibleCount(c => c + ITEMS_PER_PAGE)}
-              className="w-full py-2.5 text-xs text-[#9B7FFF] hover:text-accent-hover hover:bg-hover/30 transition-colors cursor-pointer border-t border-edge/50"
+              className="w-full py-2.5 text-xs text-[var(--t-accent)] hover:bg-hover/30 transition-colors cursor-pointer border-t border-edge/50"
             >
-              Show more ({items.length - visibleCount} remaining)
+              {t('organizer.showMore', { count: items.length - visibleCount })}
             </button>
           )}
         </div>

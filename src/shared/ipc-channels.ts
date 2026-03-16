@@ -41,6 +41,7 @@ export const IpcChannels = {
   ORGANIZER_UNDO_BATCH: 'organizer:undo-batch',
   ORGANIZER_HISTORY: 'organizer:history',
   ORGANIZER_SESSION_DETAILS: 'organizer:session-details',
+  ORGANIZER_ANALYZE_PLAN: 'organizer:analyze-plan',
 
   // Quick Search
   SEARCH_QUERY: 'search:query',

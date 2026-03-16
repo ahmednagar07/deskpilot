@@ -78,3 +78,131 @@ export async function checkDiskSpace(planItems: MovePlanItem[]): Promise<{ ok: b
     return { ok: true, needed: totalSize, available: 0 };
   }
 }
+
+export interface DriveBreakdown {
+  drive: string;
+  fileCount: number;
+  totalBytes: number;
+  freeBytes: number;
+  isCrossDrive: boolean;
+}
+
+export interface PlanAnalysis {
+  totalFiles: number;
+  totalBytes: number;
+  categoryBreakdown: Array<{ category: string; count: number; bytes: number }>;
+  sourceDrives: DriveBreakdown[];
+  destDrive: { drive: string; freeBytes: number };
+  crossDriveCount: number;
+  sameDriveCount: number;
+  spaceOk: boolean;
+  spaceNeeded: number;
+}
+
+/**
+ * Analyze a move plan to give the user full visibility into what will happen.
+ * Returns drive breakdown, cross-drive warnings, category sizes, and space check.
+ */
+export async function analyzePlan(planItems: MovePlanItem[]): Promise<PlanAnalysis> {
+  if (planItems.length === 0) {
+    return {
+      totalFiles: 0, totalBytes: 0, categoryBreakdown: [],
+      sourceDrives: [], destDrive: { drive: '', freeBytes: 0 },
+      crossDriveCount: 0, sameDriveCount: 0, spaceOk: true, spaceNeeded: 0,
+    };
+  }
+
+  // Calculate file sizes and group by category
+  const categoryMap = new Map<string, { count: number; bytes: number }>();
+  const sourceDriverMap = new Map<string, { count: number; bytes: number }>();
+  let totalBytes = 0;
+
+  for (const item of planItems) {
+    let size = 0;
+    try {
+      size = fs.statSync(item.currentPath).size;
+    } catch { /* file may not exist */ }
+
+    totalBytes += size;
+
+    // Category breakdown
+    const cat = categoryMap.get(item.category) || { count: 0, bytes: 0 };
+    cat.count++;
+    cat.bytes += size;
+    categoryMap.set(item.category, cat);
+
+    // Source drive breakdown
+    const srcDrive = (path.parse(item.currentPath).root || item.currentPath.substring(0, 3)).toUpperCase();
+    const drv = sourceDriverMap.get(srcDrive) || { count: 0, bytes: 0 };
+    drv.count++;
+    drv.bytes += size;
+    sourceDriverMap.set(srcDrive, drv);
+  }
+
+  // Destination drive
+  const destRoot = (path.parse(planItems[0].destPath).root || planItems[0].destPath.substring(0, 3)).toUpperCase();
+  let destFreeBytes = 0;
+  try {
+    const stats = await fs.promises.statfs(destRoot);
+    destFreeBytes = stats.bfree * stats.bsize;
+  } catch { /* ignore */ }
+
+  // Cross-drive analysis
+  let crossDriveCount = 0;
+  let sameDriveCount = 0;
+  for (const item of planItems) {
+    const srcDrive = (path.parse(item.currentPath).root || item.currentPath.substring(0, 3)).toUpperCase();
+    if (srcDrive === destRoot) {
+      sameDriveCount++;
+    } else {
+      crossDriveCount++;
+    }
+  }
+
+  // Source drive info with free space
+  const sourceDrives: DriveBreakdown[] = [];
+  for (const [drive, info] of sourceDriverMap) {
+    let freeBytes = 0;
+    try {
+      const stats = await fs.promises.statfs(drive);
+      freeBytes = stats.bfree * stats.bsize;
+    } catch { /* ignore */ }
+    sourceDrives.push({
+      drive,
+      fileCount: info.count,
+      totalBytes: info.bytes,
+      freeBytes,
+      isCrossDrive: drive !== destRoot,
+    });
+  }
+
+  // Space needed = only cross-drive files need extra space (same-drive = rename, no copy)
+  const crossDriveBytes = planItems.reduce((sum, item) => {
+    const srcDrive = (path.parse(item.currentPath).root || item.currentPath.substring(0, 3)).toUpperCase();
+    if (srcDrive === destRoot) return sum;
+    try {
+      return sum + fs.statSync(item.currentPath).size;
+    } catch {
+      return sum;
+    }
+  }, 0);
+
+  const spaceOk = destFreeBytes > crossDriveBytes * 1.1;
+
+  // Category breakdown sorted by count desc
+  const categoryBreakdown = Array.from(categoryMap.entries())
+    .map(([category, info]) => ({ category, count: info.count, bytes: info.bytes }))
+    .sort((a, b) => b.count - a.count);
+
+  return {
+    totalFiles: planItems.length,
+    totalBytes,
+    categoryBreakdown,
+    sourceDrives,
+    destDrive: { drive: destRoot, freeBytes: destFreeBytes },
+    crossDriveCount,
+    sameDriveCount,
+    spaceOk,
+    spaceNeeded: crossDriveBytes,
+  };
+}

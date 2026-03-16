@@ -25,7 +25,7 @@ export default function SettingsPage() {
   const [newFolderLabel, setNewFolderLabel] = useState('');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
-  const [appVersion, setAppVersion] = useState('0.1.0');
+  const [appVersion, setAppVersion] = useState('');
   const [autoScanInterval, setAutoScanInterval] = useState(0);
   const [lastAutoScan, setLastAutoScan] = useState<string | null>(null);
 

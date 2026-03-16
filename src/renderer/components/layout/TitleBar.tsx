@@ -1,9 +1,16 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 export default function TitleBar() {
+  const [version, setVersion] = useState('');
   const handleMinimize = () => window.api?.invoke('window:minimize');
   const handleMaximize = () => window.api?.invoke('window:maximize');
   const handleClose = () => window.api?.invoke('window:close');
+
+  useEffect(() => {
+    window.api?.invoke('app:get-version').then((v: unknown) => {
+      if (typeof v === 'string') setVersion(v);
+    }).catch(() => {});
+  }, []);
 
   return (
     <header className="drag-region relative flex items-center justify-between h-10 px-4 select-none shrink-0"
@@ -31,7 +38,7 @@ export default function TitleBar() {
           }}>
           DeskPilot
         </span>
-        <span className="text-faint/35 text-[10px] font-mono">0.3.0</span>
+        {version && <span className="text-faint/35 text-[10px] font-mono">{version}</span>}
       </div>
 
       <div className="no-drag flex items-center" role="group" aria-label="Window controls">

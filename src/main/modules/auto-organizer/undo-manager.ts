@@ -62,10 +62,13 @@ async function undoEntries(entries: Array<{
     try {
       // Move file back from dest to source
       if (!fs.existsSync(entry.dest_path)) {
-        // File no longer exists at destination — it was already moved or deleted
-        console.warn(`[undo] File no longer exists at destination, marking as undone: ${entry.dest_path}`);
-        moveLogRepo.markUndone(entry.id);
-        result.succeeded++;
+        // File no longer exists at destination — report as failure, not success
+        console.warn(`[undo] File no longer exists at destination: ${entry.dest_path}`);
+        result.failed++;
+        result.errors.push({
+          id: entry.id,
+          error: `File no longer exists at ${path.basename(entry.dest_path)} — it may have been moved or deleted`,
+        });
         continue;
       }
 
@@ -82,11 +85,22 @@ async function undoEntries(entries: Array<{
       if (sourceDrive.toLowerCase() === destDrive.toLowerCase()) {
         fs.renameSync(entry.dest_path, entry.source_path);
       } else {
-        await fs.promises.copyFile(entry.dest_path, entry.source_path);
-        const srcStat = await fs.promises.stat(entry.source_path);
-        const dstStat = await fs.promises.stat(entry.dest_path);
-        if (srcStat.size === dstStat.size) {
-          await fs.promises.unlink(entry.dest_path);
+        // Cross-drive: copy then verify then delete
+        try {
+          await fs.promises.copyFile(entry.dest_path, entry.source_path);
+          const srcStat = await fs.promises.stat(entry.source_path);
+          const dstStat = await fs.promises.stat(entry.dest_path);
+          if (srcStat.size === dstStat.size) {
+            await fs.promises.unlink(entry.dest_path);
+          } else {
+            // Size mismatch — remove partial copy, keep original
+            await fs.promises.unlink(entry.source_path).catch(() => {});
+            throw new Error('Copy verification failed: size mismatch');
+          }
+        } catch (copyErr) {
+          // Clean up partial copy at source if it exists
+          await fs.promises.unlink(entry.source_path).catch(() => {});
+          throw copyErr;
         }
       }
 

@@ -188,10 +188,15 @@ export default function ScannerPage() {
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput.trim()) return;
-    await window.api.invoke('gemini:set-key', apiKeyInput.trim());
-    setHasGeminiKey(true);
-    setApiKeyInput('');
-    setShowApiKeyForm(false);
+    try {
+      await window.api.invoke('gemini:set-key', apiKeyInput.trim());
+      setHasGeminiKey(true);
+      setApiKeyInput('');
+      setShowApiKeyForm(false);
+      addToast('success', 'API key saved');
+    } catch (err) {
+      addToast('error', 'Failed to save API key');
+    }
   };
 
   // Group files by category

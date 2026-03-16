@@ -59,8 +59,12 @@ export default function OrganizerPage() {
   }, []);
 
   const loadHistory = async () => {
-    const history = await window.api.invoke('organizer:history', 20) as UndoSession[];
-    setUndoHistory(history);
+    try {
+      const history = await window.api.invoke('organizer:history', 20) as UndoSession[];
+      setUndoHistory(history);
+    } catch (err) {
+      console.error('Failed to load undo history:', err);
+    }
   };
 
   const handleGeneratePlan = async () => {
@@ -71,6 +75,7 @@ export default function OrganizerPage() {
       setPlan(result);
     } catch (err) {
       console.error('Failed to generate plan:', err);
+      addToast('error', 'Failed to generate move plan. Check logs for details.');
     } finally {
       setIsGenerating(false);
     }

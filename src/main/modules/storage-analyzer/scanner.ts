@@ -7,7 +7,6 @@ import { getDirSize } from '../../utils/fs-helpers';
 import * as scanRepo from '../../database/repositories/scan-repo';
 
 const MAX_PATH_LENGTH = 250; // Windows MAX_PATH is 260, leave margin for safety
-const visitedRealPaths = new Set<string>();
 
 export interface ScanOptions {
   drives: string[];
@@ -42,7 +41,6 @@ export async function runStorageScan(options: ScanOptions, senderWindow?: Browse
 
   scanning = true;
   aborted = false;
-  visitedRealPaths.clear();
 
   const {
     drives,
@@ -54,14 +52,14 @@ export async function runStorageScan(options: ScanOptions, senderWindow?: Browse
     maxDepth = 8,
   } = options;
 
-  // Clear previous results
-  scanRepo.clearScanResults();
-
   const result: ScanResult = {
     totalItems: 0,
     totalReclaimableBytes: 0,
     byType: {},
   };
+
+  // Local set to detect symlink loops — scoped to this scan, not module-level
+  const visitedRealPaths = new Set<string>();
 
   function sendProgress(phase: string, current: number, total: number, currentPath?: string) {
     if (senderWindow && !senderWindow.isDestroyed()) {
@@ -93,10 +91,14 @@ export async function runStorageScan(options: ScanOptions, senderWindow?: Browse
   }
 
   try {
-    for (const drive of drives) {
-      if (aborted) break;
+    // Clear previous results — inside try so scanning flag resets on failure
+    scanRepo.clearScanResults();
 
-      sendProgress('Scanning drive', drives.indexOf(drive), drives.length, drive);
+    for (let driveIndex = 0; driveIndex < drives.length; driveIndex++) {
+      if (aborted) break;
+      const drive = drives[driveIndex];
+
+      sendProgress('Scanning drive', driveIndex, drives.length, drive);
 
       await scanDirectory(
         drive,
@@ -112,6 +114,7 @@ export async function runStorageScan(options: ScanOptions, senderWindow?: Browse
         },
         addResult,
         sendProgress,
+        visitedRealPaths,
       );
     }
 
@@ -136,6 +139,7 @@ async function scanDirectory(
   },
   addResult: (drive: string, type: string, path: string, size: number) => void,
   sendProgress: (phase: string, current: number, total: number, currentPath?: string) => void,
+  visitedRealPaths: Set<string>,
 ): Promise<void> {
   if (aborted || depth > maxDepth) return;
 
@@ -205,7 +209,7 @@ async function scanDirectory(
         if (shouldSkipDirectory(entry.name)) continue;
 
         // Recurse
-        await scanDirectory(rootDrive, fullPath, depth + 1, maxDepth, options, addResult, sendProgress);
+        await scanDirectory(rootDrive, fullPath, depth + 1, maxDepth, options, addResult, sendProgress, visitedRealPaths);
       } else if (entry.isFile()) {
         const stat = await fs.promises.stat(fullPath).catch(() => null);
         if (!stat) continue;

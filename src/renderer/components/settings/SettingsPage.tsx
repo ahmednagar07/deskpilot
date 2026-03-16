@@ -72,43 +72,68 @@ export default function SettingsPage() {
 
   const handleSaveApiKey = async () => {
     if (!apiKeyInput.trim()) return;
-    await window.api.invoke('gemini:set-key', apiKeyInput.trim());
-    setHasGeminiKey(true);
-    setApiKeyInput('');
-    setShowApiForm(false);
-    addToast('success', 'API key saved successfully');
+    try {
+      await window.api.invoke('gemini:set-key', apiKeyInput.trim());
+      setHasGeminiKey(true);
+      setApiKeyInput('');
+      setShowApiForm(false);
+      addToast('success', 'API key saved successfully');
+    } catch {
+      addToast('error', 'Failed to save API key');
+    }
   };
 
   const handleAddFolder = async () => {
     if (!newFolderPath.trim()) return;
-    await window.api.invoke('settings:set-folders', 'add', {
-      path: newFolderPath.trim(),
-      label: newFolderLabel.trim() || newFolderPath.trim().split('/').pop(),
-      watchMode: 'notify',
-    });
-    setNewFolderPath('');
-    setNewFolderLabel('');
-    await loadData();
-    addToast('success', 'Folder added');
+    try {
+      await window.api.invoke('settings:set-folders', 'add', {
+        path: newFolderPath.trim(),
+        label: newFolderLabel.trim() || newFolderPath.trim().split('/').pop(),
+        watchMode: 'notify',
+      });
+      setNewFolderPath('');
+      setNewFolderLabel('');
+      await loadData();
+      addToast('success', 'Folder added');
+    } catch {
+      addToast('error', 'Failed to add folder');
+    }
   };
 
   const handleRemoveFolder = async (id: number) => {
-    await window.api.invoke('settings:set-folders', 'remove', { id });
-    await loadData();
-    addToast('info', 'Folder removed');
+    try {
+      await window.api.invoke('settings:set-folders', 'remove', { id });
+      await loadData();
+      addToast('info', 'Folder removed');
+    } catch {
+      addToast('error', 'Failed to remove folder');
+    }
   };
 
   const handleToggleFolder = async (id: number, isActive: boolean) => {
-    await window.api.invoke('settings:set-folders', 'update', {
-      id,
-      updates: { is_active: isActive ? 1 : 0 },
-    });
-    await loadData();
+    try {
+      await window.api.invoke('settings:set-folders', 'update', {
+        id,
+        updates: { is_active: isActive ? 1 : 0 },
+      });
+      await loadData();
+    } catch {
+      addToast('error', 'Failed to update folder');
+    }
   };
 
-  const handleSaveSetting = async (key: string, value: unknown) => {
-    await window.api.invoke('settings:set', key, value);
+  const settingsSaveTimer = React.useRef<ReturnType<typeof setTimeout>>();
+  const handleSaveSetting = (key: string, value: unknown) => {
     setSettings(prev => ({ ...prev, [key]: value }));
+    // Debounce IPC writes for text/number inputs
+    if (settingsSaveTimer.current) clearTimeout(settingsSaveTimer.current);
+    settingsSaveTimer.current = setTimeout(async () => {
+      try {
+        await window.api.invoke('settings:set', key, value);
+      } catch {
+        addToast('error', `Failed to save ${key}`);
+      }
+    }, 500);
   };
 
   return (

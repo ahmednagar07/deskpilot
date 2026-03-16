@@ -83,7 +83,7 @@ export default function StoragePage() {
 
   // Load drive info on mount
   useEffect(() => {
-    window.api.invoke('storage:drives').then((d) => setDrives(d as DriveInfo[]));
+    window.api?.invoke('storage:drives').then((d) => setDrives(d as DriveInfo[])).catch(() => {});
   }, [setDrives]);
 
   // Listen for scan progress events
@@ -199,7 +199,12 @@ export default function StoragePage() {
         succeeded: number; failed: number; freedBytes: number;
         errors: Array<{ path: string; error: string }>;
       };
-      removeCleanedItems(ids.filter((_, i) => i < result.succeeded));
+      // Remove items that succeeded — use error paths to identify failures
+      const failedPaths = new Set(result.errors.map(e => e.path));
+      const succeededIds = scanResults
+        .filter(item => ids.includes(item.id) && !failedPaths.has(item.item_path))
+        .map(item => item.id);
+      removeCleanedItems(succeededIds);
       // Refresh drive info
       const updatedDrives = await window.api.invoke('storage:drives') as DriveInfo[];
       setDrives(updatedDrives);

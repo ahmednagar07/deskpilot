@@ -42,7 +42,9 @@ export function searchFiles(query: string, limit: number = 30): SearchResult[] {
     `).all(terms, limit) as SearchResult[];
   } catch {
     // If FTS query syntax is invalid, fall back to LIKE
-    const likePattern = `%${query.trim()}%`;
+    // Escape LIKE metacharacters in user input
+    const escaped = query.trim().replace(/[%_\\]/g, '\\$&');
+    const likePattern = `%${escaped}%`;
     return db.prepare(`
       SELECT
         f.id, f.filename, f.current_path, f.extension, f.size_bytes,
@@ -51,7 +53,7 @@ export function searchFiles(query: string, limit: number = 30): SearchResult[] {
         0 as rank
       FROM tracked_files f
       LEFT JOIN categories c ON c.id = f.category_id
-      WHERE f.filename LIKE ? OR f.current_path LIKE ?
+      WHERE f.filename LIKE ? ESCAPE '\\' OR f.current_path LIKE ? ESCAPE '\\'
       ORDER BY f.filename
       LIMIT ?
     `).all(likePattern, likePattern, limit) as SearchResult[];

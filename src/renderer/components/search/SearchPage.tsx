@@ -33,9 +33,10 @@ export default function SearchPage() {
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Focus input on mount
+  // Focus input on mount + cleanup debounce timer
   useEffect(() => {
     inputRef.current?.focus();
+    return () => { if (debounceTimer.current) clearTimeout(debounceTimer.current); };
   }, []);
 
   const doSearch = useCallback(async (q: string) => {

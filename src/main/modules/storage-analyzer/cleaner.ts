@@ -40,15 +40,8 @@ export async function cleanupApprovedItems(itemIds: number[]): Promise<CleanupRe
         continue;
       }
 
-      const stat = fs.statSync(item.item_path);
-
-      if (stat.isDirectory()) {
-        // For directories (node_modules, cache), remove recursively
-        await fs.promises.rm(item.item_path, { recursive: true, force: true });
-      } else {
-        // For files, send to Recycle Bin (safer — user can recover)
-        await shell.trashItem(item.item_path);
-      }
+      // Send everything to Recycle Bin — never permanently delete
+      await shell.trashItem(item.item_path);
 
       scanRepo.markCleaned([item.id]);
       result.succeeded++;

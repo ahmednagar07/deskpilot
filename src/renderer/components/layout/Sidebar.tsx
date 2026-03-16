@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 type Page = 'dashboard' | 'storage' | 'scanner' | 'organizer' | 'search' | 'settings';
 
@@ -44,6 +44,12 @@ const bottomNav: NavItem[] = [
 ];
 
 export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+  const [folderCount, setFolderCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    window.api?.invoke('watcher:count').then((c) => setFolderCount(c as number)).catch(() => {});
+  }, []);
+
   return (
     <nav className="relative flex flex-col w-56 shrink-0" style={{ background: 'linear-gradient(180deg, #0c0c1c, #0a0a16)' }}>
       {/* Right edge glow line */}
@@ -63,12 +69,14 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
           <NavButton key={item.id} item={item} isActive={currentPage === item.id} onClick={() => onNavigate(item.id)} />
         ))}
 
-        <div className="px-3 pt-4 pb-1">
-          <div className="flex items-center gap-2.5 text-[11px] text-faint/70">
-            <span className="w-[6px] h-[6px] rounded-full bg-success animate-pulse-dot" />
-            <span style={{ fontFamily: 'DM Sans, sans-serif' }}>Watching 4 folders</span>
+        {folderCount !== null && folderCount > 0 && (
+          <div className="px-3 pt-4 pb-1">
+            <div className="flex items-center gap-2.5 text-[11px] text-faint/70">
+              <span className="w-[6px] h-[6px] rounded-full bg-success animate-pulse-dot" />
+              <span style={{ fontFamily: 'DM Sans, sans-serif' }}>Watching {folderCount} folder{folderCount !== 1 ? 's' : ''}</span>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   );

@@ -6,11 +6,10 @@ interface FolderEntry {
   checked: boolean;
 }
 
+const USERNAME = typeof process !== 'undefined' ? process.env?.USERNAME || 'User' : 'User';
 const DEFAULT_FOLDERS: FolderEntry[] = [
-  { path: 'C:\\Users\\' + (typeof process !== 'undefined' ? process.env?.USERNAME || 'User' : 'User') + '\\Desktop', label: 'Desktop', checked: true },
-  { path: 'C:\\Users\\' + (typeof process !== 'undefined' ? process.env?.USERNAME || 'User' : 'User') + '\\Downloads', label: 'Downloads', checked: true },
-  { path: 'G:\\hard\\Work', label: 'Work', checked: false },
-  { path: 'C:\\Users\\' + (typeof process !== 'undefined' ? process.env?.USERNAME || 'User' : 'User') + '\\OneDrive\\Desktop\\Work', label: 'OneDrive Work', checked: false },
+  { path: `C:\\Users\\${USERNAME}\\Desktop`, label: 'Desktop', checked: true },
+  { path: `C:\\Users\\${USERNAME}\\Downloads`, label: 'Downloads', checked: true },
 ];
 
 export default function FirstRunWizard({ onComplete }: { onComplete: () => void }) {

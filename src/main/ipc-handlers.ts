@@ -294,13 +294,13 @@ export function registerIpcHandlers(): void {
   });
 
   // ── Auto-Updater ────────────────────────────────
-  ipcMain.handle(IpcChannels.UPDATER_CHECK, () => {
-    checkForUpdates();
+  ipcMain.handle(IpcChannels.UPDATER_CHECK, async () => {
+    await checkForUpdates();
     return true;
   });
 
-  ipcMain.handle(IpcChannels.UPDATER_DOWNLOAD, () => {
-    downloadUpdate();
+  ipcMain.handle(IpcChannels.UPDATER_DOWNLOAD, async () => {
+    await downloadUpdate();
     return true;
   });
 

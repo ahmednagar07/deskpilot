@@ -1,5 +1,6 @@
 import { autoUpdater } from 'electron-updater';
 import { BrowserWindow } from 'electron';
+import { IpcChannels } from '../shared/ipc-channels';
 
 // Don't auto-download — let the user confirm first
 autoUpdater.autoDownload = false;
@@ -13,43 +14,53 @@ function sendToRenderer(channel: string, ...args: unknown[]): void {
 // ── Event handlers ───────────────────────────────────────────
 autoUpdater.on('checking-for-update', () => {
   console.log('[Updater] Checking for update...');
-  sendToRenderer('updater:checking');
+  sendToRenderer(IpcChannels.UPDATER_CHECKING);
 });
 
 autoUpdater.on('update-available', (info) => {
   console.log('[Updater] Update available:', info.version);
-  sendToRenderer('updater:available', info);
+  sendToRenderer(IpcChannels.UPDATER_AVAILABLE, info);
 });
 
 autoUpdater.on('update-not-available', (info) => {
   console.log('[Updater] No update available. Current version is up to date.');
-  sendToRenderer('updater:not-available', info);
+  sendToRenderer(IpcChannels.UPDATER_NOT_AVAILABLE, info);
 });
 
 autoUpdater.on('download-progress', (progress) => {
   console.log(`[Updater] Download progress: ${progress.percent.toFixed(1)}%`);
-  sendToRenderer('updater:download-progress', progress);
+  sendToRenderer(IpcChannels.UPDATER_DOWNLOAD_PROGRESS, progress);
 });
 
 autoUpdater.on('update-downloaded', (info) => {
   console.log('[Updater] Update downloaded:', info.version);
-  sendToRenderer('updater:downloaded', info);
+  sendToRenderer(IpcChannels.UPDATER_DOWNLOADED, info);
 });
 
 autoUpdater.on('error', (err) => {
   console.error('[Updater] Error:', err.message);
-  sendToRenderer('updater:error', err.message);
+  sendToRenderer(IpcChannels.UPDATER_ERROR, err.message);
 });
 
 // ── Exported actions ─────────────────────────────────────────
-export function checkForUpdates(): void {
+export async function checkForUpdates(): Promise<void> {
   console.log('[Updater] checkForUpdates() called');
-  autoUpdater.checkForUpdates();
+  try {
+    await autoUpdater.checkForUpdates();
+  } catch (err) {
+    console.error('[Updater] checkForUpdates failed:', err);
+    sendToRenderer(IpcChannels.UPDATER_ERROR, err instanceof Error ? err.message : String(err));
+  }
 }
 
-export function downloadUpdate(): void {
+export async function downloadUpdate(): Promise<void> {
   console.log('[Updater] downloadUpdate() called');
-  autoUpdater.downloadUpdate();
+  try {
+    await autoUpdater.downloadUpdate();
+  } catch (err) {
+    console.error('[Updater] downloadUpdate failed:', err);
+    sendToRenderer(IpcChannels.UPDATER_ERROR, err instanceof Error ? err.message : String(err));
+  }
 }
 
 export function installUpdate(): void {

@@ -195,9 +195,9 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
--- Seed default settings
+-- Seed default settings (organized_root and managed_folders are seeded dynamically at runtime)
 INSERT INTO settings (key, value) VALUES
-  ('organized_root',            '"G:/hard/Work"'),
+  ('organized_root',            '""'),
   ('large_file_threshold_mb',   '500'),
   ('scan_depth',                '10'),
   ('launch_on_startup',         'false'),
@@ -217,9 +217,4 @@ CREATE TABLE IF NOT EXISTS managed_folders (
   added_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- Seed default managed folders
-INSERT INTO managed_folders (path, label, watch_mode) VALUES
-  ('C:/Users/Nagar.DESKTOP-KI2BE5D/Desktop',              'Desktop',      'notify'),
-  ('C:/Users/Nagar.DESKTOP-KI2BE5D/Downloads',             'Downloads',    'notify'),
-  ('G:/hard/Work',                                          'Work (G:)',    'notify'),
-  ('C:/Users/Nagar.DESKTOP-KI2BE5D/OneDrive/Desktop/Work', 'OneDrive Work','notify');
+-- Managed folders are seeded dynamically at runtime based on the user's OS paths

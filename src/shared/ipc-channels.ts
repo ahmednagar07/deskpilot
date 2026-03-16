@@ -16,9 +16,10 @@ export const IpcChannels = {
   SCANNER_START: 'scanner:start',
   SCANNER_PROGRESS: 'scanner:progress',
   SCANNER_RESULT: 'scanner:result',
-  SCANNER_CLASSIFY: 'scanner:classify',
   SCANNER_ABORT: 'scanner:abort',
   SCANNER_IS_RUNNING: 'scanner:is-running',
+  SCANNER_RESOLVE_REVIEW: 'scanner:resolve-review',
+  SCANNER_GET_REVIEW_ITEMS: 'scanner:get-review-items',
 
   // Categories
   CATEGORIES_GET_ALL: 'categories:get-all',

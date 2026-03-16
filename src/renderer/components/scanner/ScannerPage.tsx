@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useScanStore, ScannedFile, ScanResult } from '../../stores/scan-store';
+import { useScanStore, ScannedFile, ScanResult, ReviewItem } from '../../stores/scan-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useIpcEvent } from '../../hooks/useIpc';
 
@@ -57,6 +57,30 @@ const FALLBACK_ICON = (
   </svg>
 );
 
+const CATEGORY_COLORS: Record<string, string> = {
+  clients: '#3B82F6',
+  projects: '#8B5CF6',
+  medicine: '#EF4444',
+  design: '#F59E0B',
+  learning: '#10B981',
+  documents: '#6B7280',
+  media: '#EC4899',
+  tools: '#14B8A6',
+  archive: '#9CA3AF',
+};
+
+const CATEGORY_NAMES: Record<string, string> = {
+  clients: 'Clients',
+  projects: 'Projects',
+  medicine: 'Medicine',
+  design: 'Design',
+  learning: 'Learning',
+  documents: 'Documents',
+  media: 'Media',
+  tools: 'Tools',
+  archive: 'Archive',
+};
+
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
   const k = 1024;
@@ -67,18 +91,20 @@ function formatBytes(bytes: number): string {
 
 export default function ScannerPage() {
   const {
-    isScanning, scanProgress, scanResult, files,
+    isScanning, scanProgress, scanResult, files, reviewItems,
     selectedFolders, useGemini, hasGeminiKey,
     setIsScanning, setScanProgress, setScanResult, setFiles,
     setSelectedFolders, toggleFolder, setUseGemini, setHasGeminiKey,
+    setReviewItems, removeReviewItem,
   } = useScanStore();
 
   const addToast = useToastStore(s => s.addToast);
   const [managedFolders, setManagedFolders] = useState<Array<{ id: number; path: string; label: string }>>([]);
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showApiKeyForm, setShowApiKeyForm] = useState(false);
+  const [categories, setCategories] = useState<Array<{ id: number; slug: string; name: string; color: string }>>([]);
 
-  // Load managed folders and Gemini key status on mount
+  // Load managed folders, Gemini key status, and categories on mount
   useEffect(() => {
     window.api.invoke('settings:get-folders').then((folders) => {
       const f = folders as Array<{ id: number; path: string; label: string; is_active: number }>;
@@ -90,6 +116,9 @@ export default function ScannerPage() {
       }
     });
     window.api.invoke('gemini:has-key').then((has) => setHasGeminiKey(has as boolean));
+    window.api.invoke('categories:get-all').then((cats) => {
+      setCategories(cats as Array<{ id: number; slug: string; name: string; color: string }>);
+    });
   }, []);
 
   // Listen for scan progress
@@ -102,23 +131,58 @@ export default function ScannerPage() {
     setIsScanning(true);
     setScanResult(null);
     setFiles([]);
+    setReviewItems([]);
     try {
-      const result = await window.api.invoke('scanner:start', {
+      const rawResult = await window.api.invoke('scanner:start', {
         folderPaths: selectedFolders,
         useGemini,
-      }) as ScanResult;
+      });
+
+      // Check for error response (e.g., scan already in progress)
+      if (rawResult && typeof rawResult === 'object' && 'error' in (rawResult as Record<string, unknown>)) {
+        addToast('error', (rawResult as { error: string }).error);
+        return;
+      }
+
+      const result = rawResult as ScanResult;
       setScanResult(result);
 
       // Fetch classified files
       const classified = await window.api.invoke('scanner:result') as ScannedFile[];
       setFiles(classified);
-      addToast('success', `Scan complete: ${classified.length} files classified`);
+
+      // Fetch review items (single source of truth — no push event listener)
+      const pending = await window.api.invoke('scanner:get-review-items') as ReviewItem[];
+      setReviewItems(pending);
+
+      if (pending.length > 0) {
+        addToast('info', `AI needs your help with ${pending.length} file${pending.length > 1 ? 's' : ''}`);
+      } else {
+        addToast('success', `Scan complete: ${classified.length} files classified`);
+      }
     } catch (err) {
       console.error('Scan failed:', err);
       addToast('error', 'File scan failed. Check logs for details.');
     } finally {
       setIsScanning(false);
       setScanProgress(null);
+    }
+  };
+
+  const handleResolveReview = async (filePath: string, categorySlug: string) => {
+    try {
+      const success = await window.api.invoke('scanner:resolve-review', filePath, categorySlug);
+      if (!success) {
+        addToast('error', `Category "${categorySlug}" not found — could not classify`);
+        return;
+      }
+      removeReviewItem(filePath);
+      // Refresh files list
+      const classified = await window.api.invoke('scanner:result') as ScannedFile[];
+      setFiles(classified);
+      addToast('success', `Classified as ${CATEGORY_NAMES[categorySlug] || categorySlug}`);
+    } catch (err) {
+      addToast('error', 'Failed to classify file');
     }
   };
 
@@ -238,7 +302,7 @@ export default function ScannerPage() {
           )}
 
           <p className="text-xs text-faint mt-3">
-            Files matching rules are classified instantly. Gemini handles the rest.
+            Files matching rules are classified instantly. AI handles ambiguous files and will ask you about uncertain ones.
           </p>
         </div>
       </div>
@@ -277,10 +341,43 @@ export default function ScannerPage() {
           <Stat label="Discovered" value={scanResult.totalDiscovered} />
           <Stat label="Rule-classified" value={scanResult.ruleClassified} color="text-success" />
           <Stat label="AI-classified" value={scanResult.geminiClassified} color="text-accent" />
-          <Stat label="Unclassified" value={scanResult.unclassified} color="text-warning" />
+          {scanResult.needsReview > 0 && (
+            <Stat label="Needs Your Input" value={scanResult.needsReview} color="text-warning" />
+          )}
+          <Stat label="Unclassified" value={scanResult.unclassified} color="text-faint" />
           {scanResult.errors.length > 0 && (
             <Stat label="Errors" value={scanResult.errors.length} color="text-danger" />
           )}
+        </div>
+      )}
+
+      {/* AI Needs Your Input — Review Queue */}
+      {reviewItems.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: 'linear-gradient(135deg, #7C5CFC, #A78BFA)' }}
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-foreground font-[Sora]">AI Needs Your Input</h2>
+              <p className="text-xs text-muted">
+                I'm not sure about {reviewItems.length} file{reviewItems.length > 1 ? 's' : ''}. Help me classify {reviewItems.length > 1 ? 'them' : 'it'} correctly.
+              </p>
+            </div>
+          </div>
+
+          {reviewItems.map((item) => (
+            <ReviewCard
+              key={item.filePath}
+              item={item}
+              onResolve={handleResolveReview}
+            />
+          ))}
         </div>
       )}
 
@@ -312,6 +409,107 @@ export default function ScannerPage() {
   );
 }
 
+/* ── Review Card — AI communicates with the user ── */
+function ReviewCard({ item, onResolve }: { item: ReviewItem; onResolve: (filePath: string, slug: string) => void }) {
+  const [showAllCategories, setShowAllCategories] = useState(false);
+
+  const allCategorySlugs = ['clients', 'projects', 'medicine', 'design', 'learning', 'documents', 'media', 'tools', 'archive'];
+
+  return (
+    <div className="v-card overflow-hidden border border-accent/20">
+      {/* AI thinking header */}
+      <div className="p-4 border-b border-edge/50" style={{ background: 'linear-gradient(135deg, rgba(124,92,252,0.06), rgba(167,139,250,0.03))' }}>
+        <div className="flex items-start gap-3">
+          {/* AI avatar */}
+          <div
+            className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+            style={{ background: 'linear-gradient(135deg, #7C5CFC, #A78BFA)' }}
+          >
+            <svg className="w-3.5 h-3.5 text-white" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-foreground leading-relaxed">{item.aiThinking}</p>
+            <p className="text-sm text-accent mt-2 font-medium italic">"{item.question}"</p>
+          </div>
+        </div>
+      </div>
+
+      {/* File info */}
+      <div className="px-4 py-3 border-b border-edge/30 bg-surface/30">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-faint shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <span className="text-sm font-medium text-foreground truncate">{item.filename}</span>
+        </div>
+        <p className="text-xs text-faint font-mono mt-1 truncate pl-6">{item.filePath}</p>
+      </div>
+
+      {/* Category choices */}
+      <div className="p-4">
+        <p className="text-xs text-muted mb-3 font-medium uppercase tracking-wider">Choose a category:</p>
+
+        {/* Best guess + alternatives */}
+        <div className="flex flex-wrap gap-2 mb-3">
+          {/* Best guess — highlighted */}
+          <button
+            onClick={() => onResolve(item.filePath, item.bestGuess)}
+            className="group flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border-2"
+            style={{
+              borderColor: CATEGORY_COLORS[item.bestGuess] || '#7C5CFC',
+              background: `${CATEGORY_COLORS[item.bestGuess] || '#7C5CFC'}15`,
+              color: CATEGORY_COLORS[item.bestGuess] || '#7C5CFC',
+            }}
+          >
+            {CATEGORY_ICONS[item.bestGuess] || FALLBACK_ICON}
+            <span>{CATEGORY_NAMES[item.bestGuess] || item.bestGuess}</span>
+            <span className="text-xs opacity-60">(best guess)</span>
+          </button>
+
+          {/* Alternatives */}
+          {item.alternatives.map((alt) => (
+            <button
+              key={alt.slug}
+              onClick={() => onResolve(item.filePath, alt.slug)}
+              className="group flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer border border-edge hover:border-accent/50 hover:bg-hover/50"
+              title={alt.reason}
+            >
+              {CATEGORY_ICONS[alt.slug] || FALLBACK_ICON}
+              <span className="text-muted group-hover:text-foreground">{CATEGORY_NAMES[alt.slug] || alt.slug}</span>
+            </button>
+          ))}
+        </div>
+
+        {/* Show all categories toggle */}
+        {!showAllCategories ? (
+          <button
+            onClick={() => setShowAllCategories(true)}
+            className="text-xs text-faint hover:text-muted cursor-pointer"
+          >
+            Show all categories...
+          </button>
+        ) : (
+          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-edge/30">
+            {allCategorySlugs
+              .filter(s => s !== item.bestGuess && !item.alternatives.some(a => a.slug === s))
+              .map((slug) => (
+                <button
+                  key={slug}
+                  onClick={() => onResolve(item.filePath, slug)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-faint hover:text-foreground hover:bg-hover/50 border border-edge/50 transition-colors cursor-pointer"
+                >
+                  {CATEGORY_NAMES[slug] || slug}
+                </button>
+              ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Stat({ label, value, color }: { label: string; value: number; color?: string }) {
   return (
     <div className="text-center">
@@ -331,6 +529,7 @@ function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) 
   // Split by method
   const ruleCount = items.filter(f => f.classification_method === 'rule').length;
   const geminiCount = items.filter(f => f.classification_method === 'gemini').length;
+  const manualCount = items.filter(f => f.classification_method === 'manual').length;
 
   return (
     <div className="v-card overflow-hidden">
@@ -352,6 +551,11 @@ function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) 
           {geminiCount > 0 && (
             <span className="text-xs text-accent bg-accent/10 px-2 py-0.5 rounded-xl">
               {geminiCount} AI
+            </span>
+          )}
+          {manualCount > 0 && (
+            <span className="text-xs text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-xl">
+              {manualCount} you
             </span>
           )}
         </div>
@@ -397,19 +601,24 @@ function ConfidenceBadge({ method, confidence }: { method: string | null; confid
   }
 
   const pct = confidence !== null ? Math.round(confidence * 100) : 0;
-  const isRule = method === 'rule';
+
+  if (method === 'rule') {
+    return <span className="text-xs text-success bg-success/10 px-2 py-0.5 rounded whitespace-nowrap">Rule</span>;
+  }
+
+  if (method === 'manual') {
+    return <span className="text-xs text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded whitespace-nowrap">You chose</span>;
+  }
 
   return (
     <span
       className={`text-xs px-2 py-0.5 rounded whitespace-nowrap ${
-        isRule
-          ? 'text-success bg-success/10'
-          : pct >= 80
-            ? 'text-accent bg-accent/10'
-            : 'text-warning bg-warning/10'
+        pct >= 80
+          ? 'text-accent bg-accent/10'
+          : 'text-warning bg-warning/10'
       }`}
     >
-      {isRule ? 'Rule' : `AI ${pct}%`}
+      AI {pct}%
     </span>
   );
 }

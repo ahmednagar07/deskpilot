@@ -8,7 +8,7 @@ import * as scanRepo from './database/repositories/scan-repo';
 import * as moveLogRepo from './database/repositories/move-log-repo';
 import { runStorageScan, abortScan, isScanning } from './modules/storage-analyzer/scanner';
 import { cleanupApprovedItems, getDriveInfo } from './modules/storage-analyzer/cleaner';
-import { runClassification, isClassifying, abortClassification, getClassifiedFiles } from './modules/file-classifier/classifier';
+import { runClassification, isClassifying, abortClassification, getClassifiedFiles, getPendingReviewItems, resolveReviewItem } from './modules/file-classifier/classifier';
 import { setGeminiApiKey, hasGeminiApiKey } from './modules/file-classifier/gemini-client';
 import { generateMovePlan, checkDiskSpace } from './modules/auto-organizer/organizer';
 import { executePlan } from './modules/auto-organizer/move-executor';
@@ -191,6 +191,14 @@ export function registerIpcHandlers(): void {
 
   ipcMain.handle(IpcChannels.SCANNER_IS_RUNNING, () => {
     return isClassifying();
+  });
+
+  ipcMain.handle(IpcChannels.SCANNER_GET_REVIEW_ITEMS, () => {
+    return getPendingReviewItems();
+  });
+
+  ipcMain.handle(IpcChannels.SCANNER_RESOLVE_REVIEW, (_event, filePath: string, categorySlug: string) => {
+    return resolveReviewItem(filePath, categorySlug);
   });
 
   // ── Gemini API Key ─────────────────────────────

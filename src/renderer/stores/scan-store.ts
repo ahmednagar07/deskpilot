@@ -22,7 +22,18 @@ export interface ScanResult {
   ruleClassified: number;
   geminiClassified: number;
   unclassified: number;
+  needsReview: number;
   errors: string[];
+}
+
+export interface ReviewItem {
+  filePath: string;
+  filename: string;
+  aiThinking: string;
+  bestGuess: string;
+  bestGuessConfidence: number;
+  alternatives: Array<{ slug: string; reason: string }>;
+  question: string;
 }
 
 interface ScanState {
@@ -33,6 +44,7 @@ interface ScanState {
   selectedFolders: string[];
   useGemini: boolean;
   hasGeminiKey: boolean;
+  reviewItems: ReviewItem[];
 
   setIsScanning: (v: boolean) => void;
   setScanProgress: (p: ScanProgress | null) => void;
@@ -42,6 +54,8 @@ interface ScanState {
   toggleFolder: (path: string) => void;
   setUseGemini: (v: boolean) => void;
   setHasGeminiKey: (v: boolean) => void;
+  setReviewItems: (items: ReviewItem[]) => void;
+  removeReviewItem: (filePath: string) => void;
 }
 
 export const useScanStore = create<ScanState>((set, get) => ({
@@ -52,6 +66,7 @@ export const useScanStore = create<ScanState>((set, get) => ({
   selectedFolders: [],
   useGemini: false,
   hasGeminiKey: false,
+  reviewItems: [],
 
   setIsScanning: (v) => set({ isScanning: v }),
   setScanProgress: (p) => set({ scanProgress: p }),
@@ -68,4 +83,8 @@ export const useScanStore = create<ScanState>((set, get) => ({
   },
   setUseGemini: (v) => set({ useGemini: v }),
   setHasGeminiKey: (v) => set({ hasGeminiKey: v }),
+  setReviewItems: (items) => set({ reviewItems: items }),
+  removeReviewItem: (filePath) => set({
+    reviewItems: get().reviewItems.filter(ri => ri.filePath !== filePath),
+  }),
 }));

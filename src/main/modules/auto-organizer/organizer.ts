@@ -1,5 +1,6 @@
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import * as fileRepo from '../../database/repositories/file-repo';
 import * as settingsRepo from '../../database/repositories/settings-repo';
 import { getCategoryById } from '../file-classifier/categories';
@@ -11,7 +12,8 @@ import { MovePlanItem } from '../../../shared/types';
  * Each plan item maps: current path → destination path (based on category target_path).
  */
 export function generateMovePlan(): MovePlanItem[] {
-  const organizedRoot = settingsRepo.getSetting<string>('organized_root') || 'G:/hard/Work';
+  const fallbackRoot = path.join(os.homedir(), 'Documents', 'Organized').replace(/\\/g, '/');
+  const organizedRoot = settingsRepo.getSetting<string>('organized_root') || fallbackRoot;
   const files = fileRepo.getUnorganizedFiles();
   const plan: MovePlanItem[] = [];
 

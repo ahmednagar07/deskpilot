@@ -48,8 +48,9 @@ export async function checkForUpdates(): Promise<void> {
   try {
     await autoUpdater.checkForUpdates();
   } catch (err) {
+    // The autoUpdater 'error' event already sends UPDATER_ERROR to the renderer.
+    // Only log here to avoid duplicate error toasts.
     console.error('[Updater] checkForUpdates failed:', err);
-    sendToRenderer(IpcChannels.UPDATER_ERROR, err instanceof Error ? err.message : String(err));
   }
 }
 
@@ -59,7 +60,6 @@ export async function downloadUpdate(): Promise<void> {
     await autoUpdater.downloadUpdate();
   } catch (err) {
     console.error('[Updater] downloadUpdate failed:', err);
-    sendToRenderer(IpcChannels.UPDATER_ERROR, err instanceof Error ? err.message : String(err));
   }
 }
 

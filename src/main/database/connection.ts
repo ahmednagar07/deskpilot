@@ -1,6 +1,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { app } from 'electron';
 
 let db: Database.Database | null = null;
@@ -35,6 +36,9 @@ export function getDatabase(): Database.Database {
 
   // Run migrations
   runMigrations(db);
+
+  // Seed dynamic defaults (OS-specific paths) if not already set
+  seedDynamicDefaults(db);
 
   return db;
 }
@@ -107,4 +111,36 @@ export function backupDatabase(): string | null {
   }
 
   return backupPath;
+}
+
+/**
+ * Seed OS-specific default paths after migrations.
+ * Only inserts if values are empty/missing — won't overwrite user changes.
+ */
+function seedDynamicDefaults(database: Database.Database): void {
+  // Set organized_root if empty
+  const rootRow = database.prepare('SELECT value FROM settings WHERE key = ?').get('organized_root') as { value: string } | undefined;
+  if (rootRow && (rootRow.value === '""' || rootRow.value === '')) {
+    const defaultRoot = path.join(os.homedir(), 'Documents', 'Organized').replace(/\\/g, '/');
+    database.prepare('UPDATE settings SET value = ? WHERE key = ?').run(JSON.stringify(defaultRoot), 'organized_root');
+    console.log(`[DB] Set default organized_root: ${defaultRoot}`);
+  }
+
+  // Seed managed folders if table is empty
+  const folderCount = database.prepare('SELECT COUNT(*) as c FROM managed_folders').get() as { c: number };
+  if (folderCount.c === 0) {
+    const homedir = os.homedir().replace(/\\/g, '/');
+    const defaultFolders = [
+      { path: `${homedir}/Desktop`, label: 'Desktop' },
+      { path: `${homedir}/Downloads`, label: 'Downloads' },
+    ];
+
+    const insert = database.prepare('INSERT OR IGNORE INTO managed_folders (path, label, watch_mode) VALUES (?, ?, ?)');
+    for (const folder of defaultFolders) {
+      if (fs.existsSync(folder.path.replace(/\//g, path.sep))) {
+        insert.run(folder.path, folder.label, 'notify');
+      }
+    }
+    console.log('[DB] Seeded default managed folders');
+  }
 }

@@ -23,7 +23,8 @@ export function searchFiles(query: string, limit: number = 30): SearchResult[] {
   const db = getDatabase();
 
   // Build FTS5 query: add prefix matching
-  const terms = query.trim().split(/\s+/).map(t => `"${t}"*`).join(' ');
+  // Strip double quotes to prevent FTS5 syntax injection
+  const terms = query.trim().split(/\s+/).map(t => `"${t.replace(/"/g, '')}"*`).join(' ');
 
   try {
     return db.prepare(`

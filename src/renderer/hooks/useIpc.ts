@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 /**
  * Hook for invoking IPC calls to the main process.
@@ -62,13 +62,16 @@ export function useIpcMutation<T = unknown>(channel: string): [
 
 /**
  * Hook for subscribing to IPC events from main process.
+ * Uses a ref to always call the latest callback without re-subscribing.
  */
 export function useIpcEvent<T = unknown>(channel: string, callback: (data: T) => void): void {
+  const callbackRef = useRef(callback);
+  useEffect(() => { callbackRef.current = callback; });
+
   useEffect(() => {
     const unsubscribe = window.api.on(channel, (data) => {
-      callback(data as T);
+      callbackRef.current(data as T);
     });
     return unsubscribe;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channel]);
 }

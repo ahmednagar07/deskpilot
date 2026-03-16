@@ -2,11 +2,11 @@ import fs from 'fs';
 import path from 'path';
 import { BrowserWindow } from 'electron';
 import { IpcChannels } from '../../../shared/ipc-channels';
-import { ClassificationResult, TrackedFile } from '../../../shared/types';
+import { TrackedFile } from '../../../shared/types';
 import * as fileRepo from '../../database/repositories/file-repo';
 import * as scanRepo from '../../database/repositories/scan-repo';
 import { classifyByRules } from './rule-engine';
-import { classifyWithGemini, hasGeminiApiKey } from './gemini-client';
+import { classifyWithGemini, hasGeminiApiKey, ReviewItem } from './gemini-client';
 import { getCategoryBySlug, getCategoryById } from './categories';
 
 // Directories to skip during file discovery
@@ -28,12 +28,23 @@ const MAX_DEPTH = 5;
 let abortFlag = false;
 let scanningFlag = false;
 
+// In-memory review queue — persists until user resolves or next scan
+let pendingReviewItems: ReviewItem[] = [];
+
 export function isClassifying(): boolean {
   return scanningFlag;
 }
 
 export function abortClassification(): void {
   abortFlag = true;
+}
+
+export function getPendingReviewItems(): ReviewItem[] {
+  return pendingReviewItems;
+}
+
+export function clearReviewItems(): void {
+  pendingReviewItems = [];
 }
 
 export interface ClassifierOptions {
@@ -47,6 +58,7 @@ export interface ClassifierResult {
   ruleClassified: number;
   geminiClassified: number;
   unclassified: number;
+  needsReview: number;
   errors: string[];
 }
 
@@ -55,7 +67,9 @@ export interface ClassifierResult {
  * 1. Discover files in managed folders
  * 2. Classify with rule engine (instant, confidence 1.0)
  * 3. Send remaining to Gemini (if enabled and API key set)
- * 4. Store all results in tracked_files table
+ *    - High confidence → auto-classified
+ *    - Low confidence → review queue (AI asks user for help)
+ * 4. Store results in tracked_files table
  */
 export async function runClassification(
   options: ClassifierOptions,
@@ -63,12 +77,14 @@ export async function runClassification(
 ): Promise<ClassifierResult> {
   scanningFlag = true;
   abortFlag = false;
+  pendingReviewItems = []; // Clear previous review queue
 
   const result: ClassifierResult = {
     totalDiscovered: 0,
     ruleClassified: 0,
     geminiClassified: 0,
     unclassified: 0,
+    needsReview: 0,
     errors: [],
   };
 
@@ -117,13 +133,14 @@ export async function runClassification(
 
     // Phase 3: Gemini classification for unmatched files
     if (unclassified.length > 0 && options.useGemini && hasGeminiApiKey()) {
-      sendProgress(senderWindow, 'Classifying with AI...', 0, unclassified.length);
+      sendProgress(senderWindow, 'AI is analyzing files...', 0, unclassified.length);
 
       try {
-        const geminiResults = await classifyWithGemini(unclassified);
+        const geminiResult = await classifyWithGemini(unclassified);
 
+        // Process confident classifications
         const classifiedPaths = new Set<string>();
-        for (const gr of geminiResults) {
+        for (const gr of geminiResult.classified) {
           if (abortFlag) break;
 
           const category = getCategoryBySlug(gr.categorySlug);
@@ -134,13 +151,32 @@ export async function runClassification(
           }
         }
 
-        // Insert remaining unclassified files with no category
+        // Store review items for user interaction
+        pendingReviewItems = geminiResult.needsReview;
+        result.needsReview = geminiResult.needsReview.length;
+
+        // Track review items as unclassified in DB (user will resolve them)
+        for (const ri of geminiResult.needsReview) {
+          classifiedPaths.add(ri.filePath);
+          // Insert with best guess but low confidence — user will override
+          const bestCat = getCategoryBySlug(ri.bestGuess);
+          insertTrackedFile(
+            ri.filePath,
+            bestCat?.id ?? null,
+            'gemini',
+            ri.bestGuessConfidence,
+          );
+        }
+
+        // Insert remaining truly unclassified files
         for (const fp of unclassified) {
           if (!classifiedPaths.has(fp)) {
             insertTrackedFile(fp, null, null, null);
             result.unclassified++;
           }
         }
+
+        // Review items are fetched via scanner:get-review-items poll after scan completes
       } catch (err) {
         result.errors.push(`Gemini: ${err instanceof Error ? err.message : String(err)}`);
         // Insert all as unclassified
@@ -164,6 +200,24 @@ export async function runClassification(
   }
 
   return result;
+}
+
+/**
+ * Resolve a review item — user chose a category.
+ */
+export function resolveReviewItem(filePath: string, categorySlug: string): boolean {
+  const category = getCategoryBySlug(categorySlug);
+  if (!category) return false;
+
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const file = fileRepo.getFileByPath(normalizedPath);
+  if (!file) return false;
+
+  fileRepo.updateFileCategory(file.id, category.id, 'manual', 1.0);
+
+  // Remove from pending queue
+  pendingReviewItems = pendingReviewItems.filter(ri => ri.filePath !== filePath);
+  return true;
 }
 
 /**

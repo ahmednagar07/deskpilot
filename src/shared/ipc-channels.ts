@@ -73,6 +73,16 @@ export const IpcChannels = {
   WINDOW_MAXIMIZE: 'window:maximize',
   WINDOW_CLOSE: 'window:close',
 
+  // Auto-Scan Scheduler
+  AUTO_SCAN_GET_INTERVAL: 'auto-scan:get-interval',
+  AUTO_SCAN_SET_INTERVAL: 'auto-scan:set-interval',
+  AUTO_SCAN_RUN_NOW: 'auto-scan:run-now',
+  AUTO_SCAN_LAST_RUN: 'auto-scan:last-run',
+
+  // Batch Rename
+  BATCH_RENAME_PREVIEW: 'batch-rename:preview',
+  BATCH_RENAME_EXECUTE: 'batch-rename:execute',
+
   // Auto-Updater
   UPDATER_CHECK: 'updater:check',
   UPDATER_DOWNLOAD: 'updater:download',

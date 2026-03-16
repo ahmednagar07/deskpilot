@@ -31,7 +31,7 @@ export default function TitleBar() {
           }}>
           DeskPilot
         </span>
-        <span className="text-faint/35 text-[10px] font-mono">0.2.0</span>
+        <span className="text-faint/35 text-[10px] font-mono">0.3.0</span>
       </div>
 
       <div className="no-drag flex items-center" role="group" aria-label="Window controls">

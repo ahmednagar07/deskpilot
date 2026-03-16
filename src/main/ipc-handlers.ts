@@ -19,6 +19,8 @@ import { getWatchedFolderCount, startWatching } from './modules/background-watch
 import { findDuplicates } from './modules/storage-analyzer/duplicate-finder';
 import { getAllFilesWithSize } from './database/repositories/file-repo';
 import { checkForUpdates, downloadUpdate, installUpdate } from './updater';
+import { getAutoScanInterval, setAutoScanInterval, runAutoScan } from './modules/background-watcher/auto-scan';
+import { suggestBetterName, resolveCollision } from './modules/auto-organizer/name-suggester';
 
 /**
  * Validate that a file path is within a managed folder (or tracked by the app).
@@ -304,6 +306,81 @@ export function registerIpcHandlers(): void {
     }
     await shell.trashItem(filePath);
     return true;
+  });
+
+  // ── Auto-Scan Scheduler ──────────────────────────
+  ipcMain.handle(IpcChannels.AUTO_SCAN_GET_INTERVAL, () => {
+    return getAutoScanInterval();
+  });
+
+  ipcMain.handle(IpcChannels.AUTO_SCAN_SET_INTERVAL, (_event, hours: number) => {
+    setAutoScanInterval(hours);
+    return true;
+  });
+
+  ipcMain.handle(IpcChannels.AUTO_SCAN_RUN_NOW, async () => {
+    await runAutoScan();
+    return true;
+  });
+
+  ipcMain.handle(IpcChannels.AUTO_SCAN_LAST_RUN, () => {
+    return settingsRepo.getSetting('last_auto_scan_at') as string | null;
+  });
+
+  // ── Batch Rename ───────────────────────────────
+  ipcMain.handle(IpcChannels.BATCH_RENAME_PREVIEW, (_event, filePaths: string[]) => {
+    return filePaths.map(fp => {
+      const filename = path.basename(fp);
+      const suggested = suggestBetterName(filename);
+      return { path: fp, original: filename, suggested };
+    });
+  });
+
+  ipcMain.handle(IpcChannels.BATCH_RENAME_EXECUTE, async (_event, renames: Array<{ oldPath: string; newName: string }>) => {
+    const fs = require('fs') as typeof import('fs');
+    const results: Array<{ oldPath: string; newPath: string; success: boolean; error?: string }> = [];
+
+    for (const { oldPath, newName } of renames) {
+      if (!isPathInManagedScope(oldPath)) {
+        results.push({ oldPath, newPath: '', success: false, error: 'Outside managed folders' });
+        continue;
+      }
+
+      const dir = path.dirname(oldPath);
+      let newPath = path.join(dir, newName);
+
+      // Resolve collision
+      newPath = resolveCollision(newPath, (p) => fs.existsSync(p));
+
+      try {
+        fs.renameSync(oldPath, newPath);
+
+        // Update tracked_files if the file is tracked
+        const normalizedOld = oldPath.replace(/\\/g, '/');
+        const normalizedNew = newPath.replace(/\\/g, '/');
+        const file = fileRepo.getFileByPath(normalizedOld);
+        if (file) {
+          fileRepo.updateFilePath(file.id, normalizedNew, path.basename(newPath));
+
+          // Log the rename for undo
+          moveLogRepo.insertMoveLog({
+            file_id: file.id,
+            source_path: normalizedOld,
+            dest_path: normalizedNew,
+            old_filename: path.basename(oldPath),
+            new_filename: path.basename(newPath),
+            session_id: `rename-${Date.now()}`,
+            operation: 'rename',
+          });
+        }
+
+        results.push({ oldPath, newPath, success: true });
+      } catch (err) {
+        results.push({ oldPath, newPath, success: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+
+    return results;
   });
 
   // ── Auto-Updater ────────────────────────────────

@@ -6,6 +6,7 @@ import { getDatabase, closeDatabase } from './database/connection';
 import { DEFAULT_SEARCH_HOTKEY } from '../shared/constants';
 import { startWatching, stopWatching } from './modules/background-watcher/watcher';
 import { startDigestScheduler, stopDigestScheduler } from './modules/background-watcher/digest';
+import { startAutoScanScheduler, stopAutoScanScheduler } from './modules/background-watcher/auto-scan';
 import { checkForUpdates } from './updater';
 
 // Prevent multiple instances
@@ -63,6 +64,9 @@ if (!gotTheLock) {
     // Start weekly digest scheduler
     startDigestScheduler();
 
+    // Start auto-scan scheduler (if configured)
+    startAutoScanScheduler();
+
     // Check for updates (only in packaged builds — dev mode handled gracefully in updater.ts)
     setTimeout(() => checkForUpdates(), 5000);
 
@@ -75,6 +79,7 @@ if (!gotTheLock) {
   });
 
   app.on('before-quit', () => {
+    stopAutoScanScheduler();
     stopDigestScheduler();
     stopWatching();
     globalShortcut.unregisterAll();

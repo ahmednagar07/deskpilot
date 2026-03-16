@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useStorageStore, DriveInfo, ScanItem, DuplicateGroup } from '../../stores/storage-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useIpcEvent } from '../../hooks/useIpc';
+import { useI18n } from '../../i18n';
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B';
@@ -78,12 +79,14 @@ export default function StoragePage() {
   } = useStorageStore();
 
   const addToast = useToastStore(s => s.addToast);
+  const { t } = useI18n();
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const [deletingDuplicates, setDeletingDuplicates] = useState(false);
+  const [drivesLoaded, setDrivesLoaded] = useState(false);
 
   // Load drive info on mount
   useEffect(() => {
-    window.api?.invoke('storage:drives').then((d) => setDrives(d as DriveInfo[])).catch(() => {});
+    window.api?.invoke('storage:drives').then((d) => { setDrives(d as DriveInfo[]); setDrivesLoaded(true); }).catch(() => setDrivesLoaded(true));
   }, [setDrives]);
 
   // Listen for scan progress events
@@ -242,14 +245,30 @@ export default function StoragePage() {
     .filter(item => selectedItems.has(item.id))
     .reduce((sum, item) => sum + item.size_bytes, 0);
 
+  // Loading skeleton
+  if (!drivesLoaded) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <div className="skeleton h-8 w-48 mb-2" />
+          <div className="skeleton h-4 w-80" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-28 rounded-xl" />)}
+        </div>
+        <div className="skeleton h-48 rounded-xl" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground font-[Sora]">Storage Analyzer</h1>
+          <h1 className="text-2xl font-bold text-foreground font-[Sora]">{t('storage.title')}</h1>
           <p className="text-muted text-sm mt-1">
-            Scan your drives for temp files, caches, and large files to reclaim space.
+            {t('storage.subtitle')}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -259,7 +278,7 @@ export default function StoragePage() {
             className="px-5 py-2.5 rounded-xl disabled:opacity-50 text-white font-medium text-sm transition-colors cursor-pointer disabled:cursor-not-allowed"
             style={{ backgroundColor: '#EC4899' }}
           >
-            {isDuplicateScanning ? 'Finding Duplicates...' : 'Find Duplicates'}
+            {isDuplicateScanning ? t('storage.scanningDuplicates') : t('storage.findDuplicates')}
           </button>
           <button
             onClick={handleScan}

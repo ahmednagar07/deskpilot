@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '../../i18n';
 
 interface DashboardData {
   fileCount: number;
@@ -129,6 +130,7 @@ function DonutChart({ segments, size = 180, strokeWidth = 22, centerLabel, cente
 export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [error, setError] = useState(false);
+  const { t } = useI18n();
 
   useEffect(() => {
     loadDashboard();
@@ -183,17 +185,17 @@ export default function DashboardPage() {
     <div className="space-y-7">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-muted text-sm mt-1">Overview of your file organization status.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('dashboard.title')}</h1>
+        <p className="text-muted text-sm mt-1">{t('dashboard.overview')}</p>
       </div>
 
       {/* Stats row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Tracked Files', value: data.fileCount },
-          { label: 'Total Size', value: formatBytes(totalTrackedSize) },
-          { label: 'Categories', value: data.byCategory.filter(c => c.count > 0).length },
-          { label: 'Watching', value: `${data.watchedFolders} folders` },
+          { label: t('dashboard.trackedFiles'), value: data.fileCount },
+          { label: t('dashboard.totalSize'), value: formatBytes(totalTrackedSize) },
+          { label: t('dashboard.categories'), value: data.byCategory.filter(c => c.count > 0).length },
+          { label: t('dashboard.watching'), value: `${data.watchedFolders} ${t('common.files')}` },
         ].map((stat, i) => (
           <div key={stat.label} className="stat-card"
             style={{ '--stat-bar': STAT_THEMES[i].bar, '--stat-glow': STAT_THEMES[i].glow, '--stat-shadow': STAT_THEMES[i].shadow } as React.CSSProperties}>
@@ -211,7 +213,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Storage Overview */}
         <div className="v-card p-5">
-          <div className="section-label mb-4">Storage Overview</div>
+          <div className="section-label mb-4">{t('dashboard.storageOverview')}</div>
           {data.drives.length > 0 && (() => {
             const primary = data.drives[0];
             const usedPct = Math.round((primary.usedBytes / primary.totalBytes) * 100);
@@ -259,7 +261,7 @@ export default function DashboardPage() {
 
         {/* Files by Category */}
         <div className="v-card p-5">
-          <div className="section-label mb-4">Files by Category</div>
+          <div className="section-label mb-4">{t('dashboard.filesByCategory')}</div>
           {data.byCategory.some(c => c.count > 0) && (
             <DonutChart
               size={180}
@@ -303,7 +305,7 @@ export default function DashboardPage() {
 
       {/* Recent Activity */}
       <div className="v-card p-5">
-        <div className="section-label mb-4">Recent Activity</div>
+        <div className="section-label mb-4">{t('dashboard.recentActivity')}</div>
         {data.recentActivity.length > 0 ? (
           <div className="space-y-2">
             {data.recentActivity.map(entry => (
@@ -326,7 +328,7 @@ export default function DashboardPage() {
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-faint/30">
               <path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="10"/>
             </svg>
-            <p className="text-sm text-faint">No file moves yet. Organize files to see activity here.</p>
+            <p className="text-sm text-faint">{t('dashboard.noMovesYet')}</p>
           </div>
         )}
       </div>

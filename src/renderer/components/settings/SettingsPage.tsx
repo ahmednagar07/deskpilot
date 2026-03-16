@@ -20,11 +20,14 @@ export default function SettingsPage() {
   const [showApiForm, setShowApiForm] = useState(false);
   const [settings, setSettings] = useState<Record<string, unknown>>({});
   const addToast = useToastStore(s => s.addToast);
+  const { t } = useI18n();
   const [newFolderPath, setNewFolderPath] = useState('');
   const [newFolderLabel, setNewFolderLabel] = useState('');
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>('idle');
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [appVersion, setAppVersion] = useState('0.1.0');
+  const [autoScanInterval, setAutoScanInterval] = useState(0);
+  const [lastAutoScan, setLastAutoScan] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -76,6 +79,14 @@ export default function SettingsPage() {
       setFolders(f);
       setHasGeminiKey(hasKey);
       setSettings({ organized_root: organizedRoot, scan_depth: scanDepth });
+
+      // Load auto-scan settings
+      const [interval, lastRun] = await Promise.all([
+        window.api.invoke('auto-scan:get-interval') as Promise<number>,
+        window.api.invoke('auto-scan:last-run') as Promise<string | null>,
+      ]);
+      setAutoScanInterval(interval);
+      setLastAutoScan(lastRun);
     } catch (err) {
       console.error('Failed to load settings:', err);
       addToast('error', 'Failed to load settings');
@@ -284,6 +295,50 @@ export default function SettingsPage() {
             />
             <p className="text-xs text-faint mt-1">How deep to scan into folder hierarchies.</p>
           </div>
+        </div>
+      </div>
+
+      {/* Auto-Scan */}
+      <div className="v-card p-5">
+        <h2 className="section-label mb-4">{t('settings.autoScan')}</h2>
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-faint block mb-1">{t('settings.scanInterval')}</label>
+            <select
+              value={autoScanInterval}
+              onChange={async (e) => {
+                const hours = parseInt(e.target.value, 10);
+                setAutoScanInterval(hours);
+                await window.api.invoke('auto-scan:set-interval', hours);
+                addToast('success', hours > 0 ? `Auto-scan set to every ${hours}h` : 'Auto-scan disabled');
+              }}
+              className="px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground cursor-pointer focus:outline-none focus:border-accent"
+            >
+              <option value={0}>{t('settings.scanDisabled')}</option>
+              <option value={1}>{t('settings.scanEvery', { hours: '1' })}</option>
+              <option value={6}>{t('settings.scanEvery', { hours: '6' })}</option>
+              <option value={12}>{t('settings.scanEvery', { hours: '12' })}</option>
+              <option value={24}>{t('settings.scanEvery', { hours: '24' })}</option>
+            </select>
+            <p className="text-xs text-faint mt-1">{t('settings.scanIntervalHint')}</p>
+          </div>
+          {lastAutoScan && (
+            <p className="text-xs text-faint">
+              {t('settings.lastAutoScan')}: {new Date(lastAutoScan).toLocaleString()}
+            </p>
+          )}
+          <button
+            onClick={async () => {
+              addToast('info', 'Running scan...');
+              await window.api.invoke('auto-scan:run-now');
+              const lr = await window.api.invoke('auto-scan:last-run') as string | null;
+              setLastAutoScan(lr);
+              addToast('success', 'Auto-scan complete');
+            }}
+            className="text-sm text-accent hover:text-accent-hover cursor-pointer"
+          >
+            {t('settings.runNow')}
+          </button>
         </div>
       </div>
 

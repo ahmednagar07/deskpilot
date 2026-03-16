@@ -15,8 +15,8 @@ Electron + React + Tailwind + SQLite + Gemini API.
 - [x] Iteration 9: Background Watcher (2026-03-16)
 - [x] Iteration 10: Dashboard + Settings (2026-03-16)
 
-## Current State — v0.2.0 Cross-Platform + i18n + Audit Hardening
-All 6 pages fully implemented + premium UI + security hardening + light/dark theme + i18n + cross-platform builds + comprehensive audit fixes.
+## Current State — v0.3.0 Scheduled Scans + Batch Rename + Full i18n
+All 6 pages fully implemented + premium UI + security hardening + light/dark theme + i18n everywhere + scheduled auto-scans + batch rename + cross-platform builds.
 
 ### Pages
 1. **Dashboard** — gradient stat cards, storage donut, recent activity, quick actions
@@ -24,15 +24,24 @@ All 6 pages fully implemented + premium UI + security hardening + light/dark the
 3. **File Scanner** — managed folder discovery, rule-based + Gemini AI classification
 4. **Auto-Organizer** — move plan generation, approve/execute, full undo history, drag-and-drop reclassification
 5. **Search** — FTS5 instant search, Ctrl+Space overlay window, category badges
-6. **Settings** — managed folders, Gemini API key (encrypted), organized root, scan depth, theme toggle, language selector
+6. **Settings** — managed folders, Gemini API key (encrypted), organized root, scan depth, auto-scan interval, theme toggle, language selector
 
 ### Backend Modules
 - Storage analyzer: recursive scanner, pattern matching, 3-phase duplicate finder, cleanup
 - File classifier: rule engine (50+ rules, priority-ordered), Gemini 3.1 Flash Lite fallback
-- Auto-organizer: move plan generation, name suggester, cross-drive safe move, undo
+- Auto-organizer: move plan generation, name suggester, batch rename, cross-drive safe move, undo
 - Quick search: FTS5 with prefix matching + LIKE fallback, overlay window
 - Background watcher: Chokidar watches managed folders, notifications for new files
 - Weekly digest: scheduled stats summary notification (12h check interval)
+- Auto-scan scheduler: configurable interval (1/6/12/24h), rules-only (no API cost)
+
+### v0.3.0 Scheduled Scans + Batch Rename + Full i18n (2026-03-16)
+- **Scheduled auto-scans**: Configurable interval (1/6/12/24h or disabled) in Settings. Rules-only scanning (no API cost). Runs in background with `auto-scan.ts` module
+- **Batch rename**: "Clean Names" button in Organizer previews junk pattern removal (Copy of, Untitled, trailing numbers, etc.), then renames with collision resolution + undo logging
+- **Full i18n coverage**: All pages (Dashboard, Storage, Scanner, Organizer, Search, Settings) now use `t()` for all user-facing strings
+- **Loading skeletons**: StoragePage shows skeleton UI while drives load
+- **IPC channels**: Added `auto-scan:get-interval`, `auto-scan:set-interval`, `auto-scan:run-now`, `auto-scan:last-run`, `batch-rename:preview`, `batch-rename:execute`
+- **Version bump**: 0.2.0 → 0.3.0
 
 ### v0.2.0 Cross-Platform + i18n + Audit (2026-03-16)
 - **Custom app icon**: Generated DeskPilot "DP" monogram icon (resources/icon.ico, icon.png, tray-icon.png) via `scripts/generate-icons.mjs`
@@ -118,7 +127,7 @@ All 6 pages fully implemented + premium UI + security hardening + light/dark the
 - Classifier: src/main/modules/file-classifier/{classifier,rule-engine,gemini-client,categories}.ts
 - Organizer: src/main/modules/auto-organizer/{organizer,move-executor,name-suggester,undo-manager}.ts
 - Search: src/main/modules/quick-search/searcher.ts
-- Watcher: src/main/modules/background-watcher/{watcher,notification,digest}.ts
+- Watcher: src/main/modules/background-watcher/{watcher,notification,digest,auto-scan}.ts
 - FS helpers: src/main/utils/fs-helpers.ts
 - Preload: src/preload/index.ts
 - App: src/renderer/App.tsx

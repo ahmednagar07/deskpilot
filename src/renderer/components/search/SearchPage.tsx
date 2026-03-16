@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { useI18n } from '../../i18n';
 
 interface SearchResult {
   id: number;
@@ -27,6 +28,7 @@ function formatBytes(bytes: number): string {
 }
 
 export default function SearchPage() {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -67,8 +69,8 @@ export default function SearchPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-foreground">Search</h1>
-        <p className="text-muted text-sm mt-1">Find any tracked file instantly by name, path, category, or extension.</p>
+        <h1 className="text-2xl font-bold text-foreground">{t('search.title')}</h1>
+        <p className="text-muted text-sm mt-1">{t('search.subtitle')}</p>
       </div>
 
       {/* Search input */}
@@ -78,7 +80,7 @@ export default function SearchPage() {
         </svg>
         <input
           ref={inputRef} type="text" value={query} onChange={handleChange}
-          placeholder="Type to search files..."
+          placeholder={t('search.typeTo')}
           className="w-full pl-12 pr-4 py-3.5 bg-card border border-edge rounded-xl text-foreground placeholder:text-faint/40 text-sm transition-all"
         />
         {isSearching && (
@@ -90,7 +92,7 @@ export default function SearchPage() {
       {results.length > 0 && (
         <div className="v-card overflow-hidden">
           <div className="px-5 py-2.5 border-b border-edge/50">
-            <span className="section-label">{results.length} results</span>
+            <span className="section-label">{t('search.results', { count: results.length })}</span>
           </div>
           <div className="max-h-[calc(100vh-300px)] overflow-y-auto">
             {results.map((result) => (
@@ -130,8 +132,8 @@ export default function SearchPage() {
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-faint/25 mb-4">
             <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35" strokeLinecap="round"/>
           </svg>
-          <p className="text-muted text-lg">No files found for "<span className="text-accent/70">{query}</span>"</p>
-          <p className="text-faint/60 mt-2 text-sm">Try scanning files in the Scanner tab first</p>
+          <p className="text-muted text-lg">{t('search.noResultsFor')} "<span className="text-accent/70">{query}</span>"</p>
+          <p className="text-faint/60 mt-2 text-sm">{t('search.scanFirst')}</p>
         </div>
       )}
 
@@ -140,8 +142,8 @@ export default function SearchPage() {
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-accent/25 mb-4">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          <p className="text-muted text-lg">Start typing to search your files</p>
-          <p className="text-faint/60 mt-2 text-sm">Searches by filename, path, category, and extension</p>
+          <p className="text-muted text-lg">{t('search.startTyping')}</p>
+          <p className="text-faint/60 mt-2 text-sm">{t('search.searchBy')}</p>
         </div>
       )}
     </div>

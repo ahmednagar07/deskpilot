@@ -42,9 +42,10 @@ linux:
   icon: resources/icon.png
   category: Utility
   desktop:
-    Name: DeskPilot
-    Comment: Smart desktop file management
-    Terminal: false
+    entry:
+      Name: DeskPilot
+      Comment: Smart desktop file management
+      Terminal: "false"
 
 appImage:
   artifactName: "${productName}-${version}-linux.${ext}"

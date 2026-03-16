@@ -41,6 +41,10 @@ export default function OrganizerPage() {
   const [allCategories, setAllCategories] = useState<Category[]>([]);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Batch rename state
+  const [renamePreview, setRenamePreview] = useState<Array<{ path: string; original: string; suggested: string | null }> | null>(null);
+  const [isRenaming, setIsRenaming] = useState(false);
+
   // Load undo history on mount
   useEffect(() => {
     loadHistory();
@@ -153,6 +157,47 @@ export default function OrganizerPage() {
     addToast('success', `Moved file to "${categoryName}"`);
   }, [draggingFileId, allCategories, plan, setPlan, addToast]);
 
+  // --- Batch Rename ---
+  const handleBatchRenamePreview = async () => {
+    const filePaths = plan.map(item => item.currentPath);
+    try {
+      const preview = await window.api.invoke('batch-rename:preview', filePaths) as Array<{ path: string; original: string; suggested: string | null }>;
+      const withSuggestions = preview.filter(p => p.suggested !== null);
+      if (withSuggestions.length === 0) {
+        addToast('info', 'All filenames are already clean');
+        return;
+      }
+      setRenamePreview(withSuggestions);
+    } catch (err) {
+      console.error('Batch rename preview failed:', err);
+      addToast('error', 'Failed to generate rename suggestions');
+    }
+  };
+
+  const handleBatchRenameExecute = async () => {
+    if (!renamePreview) return;
+    setIsRenaming(true);
+    try {
+      const renames = renamePreview
+        .filter(p => p.suggested !== null)
+        .map(p => ({ oldPath: p.path, newName: p.suggested! }));
+      const results = await window.api.invoke('batch-rename:execute', renames) as Array<{ oldPath: string; newPath: string; success: boolean; error?: string }>;
+      const succeeded = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success).length;
+      if (failed > 0) {
+        addToast('warning', `Renamed ${succeeded} files, ${failed} failed`);
+      } else {
+        addToast('success', `Renamed ${succeeded} files`);
+      }
+      setRenamePreview(null);
+    } catch (err) {
+      console.error('Batch rename failed:', err);
+      addToast('error', 'Batch rename failed');
+    } finally {
+      setIsRenaming(false);
+    }
+  };
+
   const approvedCount = useMemo(() => plan.filter(p => p.approved).length, [plan]);
 
   // Group plan by category — memoized to avoid O(n) re-grouping on every render
@@ -236,6 +281,9 @@ export default function OrganizerPage() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
+                <button onClick={handleBatchRenamePreview} className="text-xs text-[#22D3EE] hover:text-[#06B6D4] cursor-pointer">
+                  Clean Names
+                </button>
                 <button onClick={approveAll} className="text-xs text-[#9B7FFF] hover:text-[#7C5CFC] cursor-pointer">
                   Approve All
                 </button>
@@ -324,6 +372,44 @@ export default function OrganizerPage() {
               </div>
             ))
           )}
+        </div>
+      )}
+
+      {/* Batch Rename Preview Modal */}
+      {renamePreview && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="v-card max-w-lg w-full max-h-[70vh] flex flex-col">
+            <div className="p-5 border-b border-edge">
+              <h3 className="text-lg font-semibold text-foreground font-[Sora]">Clean Filenames</h3>
+              <p className="text-xs text-faint mt-1">{renamePreview.length} files will be renamed</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5 space-y-2">
+              {renamePreview.map((item) => (
+                <div key={item.path} className="flex items-center gap-2 py-1.5 text-sm">
+                  <span className="text-faint line-through truncate flex-1">{item.original}</span>
+                  <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  <span className="text-success truncate flex-1">{item.suggested}</span>
+                </div>
+              ))}
+            </div>
+            <div className="p-4 border-t border-edge flex justify-end gap-3">
+              <button
+                onClick={() => setRenamePreview(null)}
+                className="px-4 py-2 text-sm text-faint hover:text-muted cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleBatchRenameExecute}
+                disabled={isRenaming}
+                className="px-5 py-2 btn-primary rounded-xl text-sm font-medium cursor-pointer disabled:opacity-50"
+              >
+                {isRenaming ? 'Renaming...' : `Rename ${renamePreview.length} Files`}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

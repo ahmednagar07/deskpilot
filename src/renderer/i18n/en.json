@@ -30,7 +30,18 @@
     "filesByCategory": "Files by Category",
     "storageOverview": "Storage Overview",
     "noActivity": "No recent activity",
-    "noFilesYet": "No files tracked yet. Run a scan to get started."
+    "noFilesYet": "No files tracked yet. Run a scan to get started.",
+    "trackedFiles": "Tracked Files",
+    "totalSize": "Total Size",
+    "categories": "Categories",
+    "overview": "Overview of your file organization status.",
+    "noMovesYet": "No file moves yet. Organize files to see activity here.",
+    "scanFilesAction": "Scan Files",
+    "discoverClassify": "Discover & classify",
+    "smartMoves": "Smart file moves",
+    "reclaimSpace": "Reclaim space",
+    "totalFilesLabel": "total files",
+    "smartDesc": "Smart desktop file management. Scan, classify, and organize your files with AI-powered intelligence."
   },
   "storage": {
     "title": "Storage Analyzer",
@@ -96,13 +107,26 @@
     "undoSession": "Undo Session",
     "filesMoved": "{{count}} files moved",
     "generateHint": "Click \"Generate Plan\" to create a move plan from classified files",
-    "scanFirst": "Make sure you've scanned files first in the Scanner tab"
+    "scanFirst": "Make sure you've scanned files first in the Scanner tab",
+    "cleanNames": "Clean Names",
+    "cleanFilenames": "Clean Filenames",
+    "filesWillBeRenamed": "{{count}} files will be renamed",
+    "renaming": "Renaming...",
+    "renameFiles": "Rename {{count}} Files",
+    "movedToCategory": "Moved file to \"{{category}}\""
   },
   "search": {
     "title": "Search",
     "placeholder": "Search files...",
     "noResults": "No results found",
-    "hint": "Start typing to search across all tracked files"
+    "hint": "Start typing to search across all tracked files",
+    "subtitle": "Find any tracked file instantly by name, path, category, or extension.",
+    "typeTo": "Type to search files...",
+    "startTyping": "Start typing to search your files",
+    "searchBy": "Searches by filename, path, category, and extension",
+    "results": "{{count}} results",
+    "noResultsFor": "No files found for",
+    "scanFirst": "Try scanning files in the Scanner tab first"
   },
   "settings": {
     "title": "Settings",
@@ -136,7 +160,18 @@
     "checkAgain": "Check again",
     "updateCheckFailed": "Update check failed",
     "retry": "Retry",
-    "about": "About"
+    "about": "About",
+    "autoScan": "Scheduled Scanning",
+    "scanInterval": "Scan Interval",
+    "scanDisabled": "Disabled",
+    "scanEvery": "Every {{hours}} hours",
+    "scanIntervalHint": "Automatically scan managed folders at this interval (rules only, no API cost).",
+    "lastAutoScan": "Last auto-scan",
+    "runNow": "Run Scan Now",
+    "language": "Language",
+    "languageHint": "Choose your preferred display language.",
+    "remove": "Remove",
+    "configure": "Configure"
   },
   "wizard": {
     "welcome": "Welcome to DeskPilot",

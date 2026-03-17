@@ -1,6 +1,6 @@
 {
   "name": "deskpilot",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "description": "Smart desktop management app — organize files, clean storage, find anything instantly",
   "main": "dist/main/index.js",
   "scripts": {

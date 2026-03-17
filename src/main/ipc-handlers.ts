@@ -1,4 +1,4 @@
-import { ipcMain, app, BrowserWindow, shell } from 'electron';
+import { ipcMain, app, BrowserWindow, shell, dialog } from 'electron';
 import path from 'path';
 import { IpcChannels } from '../shared/ipc-channels';
 import * as settingsRepo from './database/repositories/settings-repo';
@@ -227,12 +227,15 @@ export function registerIpcHandlers(): void {
     return generateMovePlan(folderPaths);
   });
 
-  ipcMain.handle(IpcChannels.ORGANIZER_EXECUTE, async (_event, approvedItems: MovePlanItem[]) => {
+  ipcMain.handle(IpcChannels.ORGANIZER_EXECUTE, async (event, approvedItems: MovePlanItem[]) => {
     const spaceCheck = await checkDiskSpace(approvedItems);
     if (!spaceCheck.ok) {
       return { error: 'Not enough disk space', ...spaceCheck };
     }
-    return await executePlan(approvedItems);
+    const senderWindow = BrowserWindow.fromWebContents(event.sender);
+    return await executePlan(approvedItems, (progress) => {
+      senderWindow?.webContents.send(IpcChannels.ORGANIZER_MOVE_PROGRESS, progress);
+    });
   });
 
   ipcMain.handle(IpcChannels.ORGANIZER_UNDO, async (_event, moveLogId: number) => {
@@ -279,6 +282,16 @@ export function registerIpcHandlers(): void {
     }
     shell.showItemInFolder(filePath);
     return true;
+  });
+
+  ipcMain.handle(IpcChannels.DIALOG_OPEN_FOLDER, async (event, defaultPath?: string) => {
+    const win = BrowserWindow.fromWebContents(event.sender);
+    const result = await dialog.showOpenDialog(win!, {
+      properties: ['openDirectory'],
+      defaultPath: defaultPath || undefined,
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0].replace(/\\/g, '/');
   });
 
   ipcMain.handle(IpcChannels.SEARCH_RESIZE, (_event, resultCount: number) => {

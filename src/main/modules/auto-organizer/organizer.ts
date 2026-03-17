@@ -7,10 +7,89 @@ import * as scanRepo from '../../database/repositories/scan-repo';
 import { getCategoryById } from '../file-classifier/categories';
 import { suggestBetterName } from './name-suggester';
 import { MovePlanItem } from '../../../shared/types';
+import { getDatabase } from '../../database/connection';
+
+/**
+ * Context-aware subfolder rules.
+ *
+ * For categories like Clients and Projects, we extract a known entity name
+ * from the file's source path and use it as a subfolder. This means:
+ *
+ *   Desktop/LOC/contract.pdf  →  Organized/Clients/LOC/contract.pdf
+ *   Desktop/LOC/logo.png      →  Organized/Clients/LOC/logo.png
+ *
+ * Instead of the USELESS type-based organization:
+ *   Desktop/LOC/contract.pdf  →  Organized/Documents/contract.pdf
+ *   Desktop/LOC/logo.png      →  Organized/Media/logo.png
+ */
+
+interface PathContextRule {
+  categorySlug: string;
+  ruleValue: string;   // e.g. "LOC", "Clawdbot"
+}
+
+/**
+ * Load path_contains rules from the database.
+ * These tell us which folder names map to which categories (Clients, Projects, etc.)
+ */
+function getPathContextRules(): PathContextRule[] {
+  const db = getDatabase();
+  const rows = db.prepare(`
+    SELECT c.slug as category_slug, cr.rule_value
+    FROM classification_rules cr
+    JOIN categories c ON c.id = cr.category_id
+    WHERE cr.rule_type = 'path_contains' AND cr.is_active = 1
+    ORDER BY cr.priority ASC
+  `).all() as Array<{ category_slug: string; rule_value: string }>;
+
+  return rows.map(r => ({ categorySlug: r.category_slug, ruleValue: r.rule_value }));
+}
+
+/**
+ * Extract the context subfolder from a file's source path.
+ *
+ * For a file at `G:/hard/Work/Clients/LOC/docs/contract.pdf`:
+ * - If `path_contains: LOC` matched → returns "LOC"
+ * - If path has additional subfolders after the match → preserves them: "LOC/docs"
+ *
+ * For a file at `C:/Users/Desktop/random.pdf` with no context match → returns null.
+ */
+function extractContextSubfolder(filePath: string, contextRules: PathContextRule[], categorySlug: string): string | null {
+  const normalizedPath = filePath.replace(/\\/g, '/');
+  const parts = normalizedPath.split('/');
+
+  // Find matching context rules for this category
+  const rulesForCategory = contextRules.filter(r => r.categorySlug === categorySlug);
+
+  for (const rule of rulesForCategory) {
+    const ruleValueLower = rule.ruleValue.toLowerCase();
+
+    // Find the matching folder segment in the path
+    for (let i = 0; i < parts.length - 1; i++) {
+      if (parts[i].toLowerCase().includes(ruleValueLower)) {
+        // Found the context folder. Use the matched folder name as-is (preserving case)
+        // and include any subfolders between it and the filename
+        const contextFolder = parts[i];
+        const subParts = parts.slice(i + 1, parts.length - 1); // folders after match, before filename
+
+        if (subParts.length > 0) {
+          return `${contextFolder}/${subParts.join('/')}`;
+        }
+        return contextFolder;
+      }
+    }
+  }
+
+  return null;
+}
 
 /**
  * Generate a move plan for unorganized, classified files.
  * SCOPED to active managed folders only — never pulls files from outside.
+ *
+ * SMART ORGANIZATION:
+ * - Files with context (client/project path) → Organized/Clients/LOC/file.pdf
+ * - Files without context (loose on Desktop) → Organized/Documents/file.pdf
  */
 export function generateMovePlan(scopeFolderPaths?: string[]): MovePlanItem[] {
   const fallbackRoot = path.join(os.homedir(), 'Documents', 'Organized').replace(/\\/g, '/');
@@ -23,6 +102,9 @@ export function generateMovePlan(scopeFolderPaths?: string[]): MovePlanItem[] {
   const files = fileRepo.getUnorganizedFilesInFolders(folderPaths);
   const plan: MovePlanItem[] = [];
 
+  // Load context rules for smart subfolder detection
+  const contextRules = getPathContextRules();
+
   for (const file of files) {
     // Skip files without a category
     if (!file.category_id) continue;
@@ -30,7 +112,18 @@ export function generateMovePlan(scopeFolderPaths?: string[]): MovePlanItem[] {
     const category = getCategoryById(file.category_id);
     if (!category || !category.target_path) continue;
 
-    const destDir = path.join(organizedRoot, category.target_path);
+    // Smart destination: try to extract context subfolder from source path
+    const contextSubfolder = extractContextSubfolder(file.current_path, contextRules, category.slug);
+
+    let destDir: string;
+    if (contextSubfolder) {
+      // Context-aware: Organized/Clients/LOC/  or  Organized/Projects/Clawdbot/src/
+      destDir = path.join(organizedRoot, category.target_path, contextSubfolder);
+    } else {
+      // Flat fallback: Organized/Documents/  or  Organized/Media/
+      destDir = path.join(organizedRoot, category.target_path);
+    }
+
     const suggestedName = suggestBetterName(file.filename);
     const finalName = suggestedName || file.filename;
     const destPath = path.join(destDir, finalName).replace(/\\/g, '/');

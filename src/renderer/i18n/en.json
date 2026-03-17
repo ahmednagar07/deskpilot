@@ -141,7 +141,13 @@
     "renamePartial": "Renamed {{succeeded}} files, {{failed}} failed",
     "selectFolders": "Select folders to organize",
     "organizedRoot": "Organized into",
-    "filesMovedToSubfolders": "Files will be sorted into category subfolders"
+    "filesMovedToSubfolders": "Files will be sorted into category subfolders",
+    "browse": "Browse",
+    "movingFiles": "Moving Files",
+    "doNotClose": "Please do not close the app during this operation",
+    "bytesProcessed": "Data processed",
+    "estimatedTime": "Estimated time remaining",
+    "currentFile": "Current file"
   },
   "search": {
     "title": "Search",

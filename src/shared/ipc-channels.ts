@@ -42,15 +42,17 @@ export const IpcChannels = {
   ORGANIZER_HISTORY: 'organizer:history',
   ORGANIZER_SESSION_DETAILS: 'organizer:session-details',
   ORGANIZER_ANALYZE_PLAN: 'organizer:analyze-plan',
+  ORGANIZER_MOVE_PROGRESS: 'organizer:move-progress',
 
   // Quick Search
   SEARCH_QUERY: 'search:query',
   SEARCH_REINDEX: 'search:reindex',
   SEARCH_RESIZE: 'search:resize',
 
-  // Shell
+  // Shell / Dialogs
   SHELL_OPEN_FILE: 'shell:open-file',
   SHELL_OPEN_FOLDER: 'shell:open-folder',
+  DIALOG_OPEN_FOLDER: 'dialog:open-folder',
 
   // Gemini
   GEMINI_HAS_KEY: 'gemini:has-key',

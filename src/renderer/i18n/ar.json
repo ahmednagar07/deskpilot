@@ -141,7 +141,13 @@
     "renamePartial": "تمت إعادة تسمية {{succeeded}} ملف، فشل {{failed}}",
     "selectFolders": "اختر المجلدات للتنظيم",
     "organizedRoot": "تنظيم في",
-    "filesMovedToSubfolders": "سيتم ترتيب الملفات في مجلدات فرعية حسب الفئة"
+    "filesMovedToSubfolders": "سيتم ترتيب الملفات في مجلدات فرعية حسب الفئة",
+    "browse": "تصفح",
+    "movingFiles": "جاري نقل الملفات",
+    "doNotClose": "يرجى عدم إغلاق التطبيق أثناء هذه العملية",
+    "bytesProcessed": "البيانات المعالجة",
+    "estimatedTime": "الوقت المتبقي المقدر",
+    "currentFile": "الملف الحالي"
   },
   "search": {
     "title": "البحث",

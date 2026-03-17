@@ -42,7 +42,7 @@ export default function OrganizerPage() {
 
   const addToast = useToastStore(s => s.addToast);
   const [activeTab, setActiveTab] = useState<'plan' | 'history'>('plan');
-  const [executionResult, setExecutionResult] = useState<{ succeeded: number; failed: number } | null>(null);
+  const [executionResult, setExecutionResult] = useState<{ succeeded: number; failed: number; firstError?: string } | null>(null);
 
   // Safety: plan analysis + confirmation
   const [analysis, setAnalysis] = useState<PlanAnalysis | null>(null);
@@ -56,6 +56,16 @@ export default function OrganizerPage() {
   // Batch rename state
   const [renamePreview, setRenamePreview] = useState<Array<{ path: string; original: string; suggested: string | null }> | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
+
+  // Move progress state
+  const [moveProgress, setMoveProgress] = useState<{
+    current: number;
+    total: number;
+    currentFile: string;
+    bytesProcessed: number;
+    totalBytes: number;
+    startedAt: number;
+  } | null>(null);
 
   // Folder picker state
   const [managedFolders, setManagedFolders] = useState<Array<{ id: number; path: string; label: string }>>([]);
@@ -78,6 +88,18 @@ export default function OrganizerPage() {
     window.api.invoke('settings:get', 'organized_root').then((root) => {
       if (root) setOrganizedRoot(root as string);
     });
+  }, []);
+
+  // Listen for move progress events
+  useEffect(() => {
+    const unsub = window.api.on('organizer:move-progress', (progress: unknown) => {
+      const p = progress as { current: number; total: number; currentFile: string; bytesProcessed: number; totalBytes: number };
+      setMoveProgress(prev => ({
+        ...p,
+        startedAt: prev?.startedAt || Date.now(),
+      }));
+    });
+    return unsub;
   }, []);
 
   // Load all categories on mount (needed for dock + reclassification)
@@ -143,9 +165,12 @@ export default function OrganizerPage() {
     if (approved.length === 0) return;
 
     setIsExecuting(true);
+    setMoveProgress({ current: 0, total: approved.length, currentFile: '', bytesProcessed: 0, totalBytes: 0, startedAt: Date.now() });
     try {
       const result = await window.api.invoke('organizer:execute', approved) as {
-        succeeded: number; failed: number; sessionId: string; errors: Array<{ path: string; error: string }>;
+        succeeded: number; failed: number; sessionId: string;
+        errors: Array<{ path: string; error: string }>;
+        warnings: Array<{ path: string; warning: string }>;
         error?: string;
       };
 
@@ -155,12 +180,19 @@ export default function OrganizerPage() {
         return;
       }
 
-      setExecutionResult({ succeeded: result.succeeded, failed: result.failed });
+      setExecutionResult({ succeeded: result.succeeded, failed: result.failed, firstError: result.errors?.[0]?.error });
 
-      if (result.failed > 0) {
+      if (result.failed > 0 && result.succeeded > 0) {
         addToast('warning', `${result.succeeded} ${t('common.files')} moved, ${result.failed} failed`);
+      } else if (result.failed > 0 && result.succeeded === 0) {
+        const firstError = result.errors?.[0]?.error || 'Unknown error';
+        addToast('error', `${t('toast.moveFailed')}: ${firstError}`);
       } else {
         addToast('success', t('organizer.moveFiles', { count: result.succeeded }));
+      }
+
+      if (result.warnings?.length > 0) {
+        addToast('info', `${result.warnings.length} files copied but source could not be trashed`);
       }
 
       // Remove succeeded items from plan
@@ -174,6 +206,7 @@ export default function OrganizerPage() {
       addToast('error', t('toast.moveFailed'));
     } finally {
       setIsExecuting(false);
+      setMoveProgress(null);
     }
   };
 
@@ -362,6 +395,18 @@ export default function OrganizerPage() {
               placeholder={t('settings.organizedRootHint')}
               className="flex-1 px-3 py-1.5 bg-surface border border-edge rounded-lg text-sm text-foreground font-mono placeholder:text-faint focus:outline-none focus:border-accent"
             />
+            <button
+              onClick={async () => {
+                const selected = await window.api.invoke('dialog:open-folder', organizedRoot || undefined) as string | null;
+                if (selected) {
+                  setOrganizedRoot(selected);
+                  window.api.invoke('settings:set', 'organized_root', selected);
+                }
+              }}
+              className="px-3 py-1.5 bg-accent/10 border border-accent/30 rounded-lg text-sm text-accent hover:bg-accent/20 transition-colors cursor-pointer shrink-0"
+            >
+              {t('organizer.browse')}
+            </button>
           </div>
           <p className="text-xs text-faint mt-1.5 pl-6">{t('organizer.filesMovedToSubfolders')}</p>
         </div>
@@ -399,10 +444,18 @@ export default function OrganizerPage() {
             <div className={`p-3 rounded-xl border text-sm ${
               executionResult.failed === 0
                 ? 'bg-success/10 border-success/30 text-success'
-                : 'bg-warning/10 border-warning/30 text-warning'
+                : executionResult.succeeded === 0
+                  ? 'bg-danger/10 border-danger/30 text-danger'
+                  : 'bg-warning/10 border-warning/30 text-warning'
             }`}>
-              {t('organizer.filesMoved', { count: executionResult.succeeded })}.
-              {executionResult.failed > 0 && ` ${executionResult.failed} failed.`}
+              <div>
+                {executionResult.succeeded > 0 && t('organizer.filesMoved', { count: executionResult.succeeded })}
+                {executionResult.succeeded > 0 && executionResult.failed > 0 && '. '}
+                {executionResult.failed > 0 && `${executionResult.failed} failed.`}
+              </div>
+              {executionResult.firstError && executionResult.failed > 0 && (
+                <div className="text-xs mt-1 opacity-80">{executionResult.firstError}</div>
+              )}
             </div>
           )}
 
@@ -569,6 +622,11 @@ export default function OrganizerPage() {
             <CategoryDockPill key={cat.id} category={cat} onDrop={handleDropOnCategory} />
           ))}
         </div>
+      )}
+
+      {/* Move Progress Overlay */}
+      {isExecuting && moveProgress && (
+        <MoveProgressOverlay progress={moveProgress} t={t} />
       )}
     </div>
   );
@@ -739,6 +797,88 @@ function ConfirmMoveDialog({
             {t('organizer.proceedMove')}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Move Progress Overlay ────────────────────────────────────────────────────
+
+function MoveProgressOverlay({
+  progress,
+  t,
+}: {
+  progress: { current: number; total: number; currentFile: string; bytesProcessed: number; totalBytes: number; startedAt: number };
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const pct = progress.total > 0 ? Math.round((progress.current / progress.total) * 100) : 0;
+  const elapsed = (Date.now() - progress.startedAt) / 1000; // seconds
+  const rate = progress.current > 0 ? elapsed / progress.current : 0; // seconds per file
+  const remaining = Math.max(0, Math.round(rate * (progress.total - progress.current)));
+
+  const formatTime = (secs: number): string => {
+    if (secs < 60) return `${secs}s`;
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return `${m}m ${s}s`;
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="v-card max-w-md w-full p-6 space-y-5">
+        {/* Header */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-accent/20 flex items-center justify-center">
+            <svg className="w-5 h-5 text-accent animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground font-[Sora]">{t('organizer.movingFiles')}</h3>
+            <p className="text-xs text-faint">{t('organizer.doNotClose')}</p>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-foreground font-medium">{pct}%</span>
+            <span className="text-faint">{progress.current} / {progress.total} {t('common.files')}</span>
+          </div>
+          <div className="w-full h-3 bg-surface rounded-full overflow-hidden border border-edge/50">
+            <div
+              className="h-full rounded-full transition-all duration-300 ease-out"
+              style={{
+                width: `${pct}%`,
+                background: 'linear-gradient(90deg, #7C5CFC, #2DD4A8)',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Stats grid */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-surface/50 rounded-lg p-3">
+            <div className="text-xs text-faint">{t('organizer.bytesProcessed')}</div>
+            <div className="text-sm font-medium text-foreground mt-0.5">
+              {formatBytes(progress.bytesProcessed)} / {formatBytes(progress.totalBytes)}
+            </div>
+          </div>
+          <div className="bg-surface/50 rounded-lg p-3">
+            <div className="text-xs text-faint">{t('organizer.estimatedTime')}</div>
+            <div className="text-sm font-medium text-foreground mt-0.5">
+              {progress.current > 0 ? `~${formatTime(remaining)}` : '...'}
+            </div>
+          </div>
+        </div>
+
+        {/* Current file */}
+        {progress.currentFile && (
+          <div className="bg-surface/50 rounded-lg p-3">
+            <div className="text-xs text-faint mb-1">{t('organizer.currentFile')}</div>
+            <div className="text-sm text-foreground font-mono truncate">{progress.currentFile}</div>
+          </div>
+        )}
       </div>
     </div>
   );

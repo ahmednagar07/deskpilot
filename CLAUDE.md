@@ -15,8 +15,14 @@ Electron + React + Tailwind + SQLite + Gemini API.
 - [x] Iteration 9: Background Watcher (2026-03-16)
 - [x] Iteration 10: Dashboard + Settings (2026-03-16)
 
-## Current State — v0.3.0 Scheduled Scans + Batch Rename + Full i18n
+## Current State — v0.5.4 Scoped Scanning + AI Test + Destination Picker
 All 6 pages fully implemented + premium UI + security hardening + light/dark theme + i18n everywhere + scheduled auto-scans + batch rename + cross-platform builds.
+
+### v0.5.x Changes (2026-03-17)
+- **v0.5.1**: Folder-scoped scanning — Scanner and Organizer only process files from selected folders (SQL LIKE scoping). Organizer folder picker with checkboxes.
+- **v0.5.2**: Stats bar consistency — stats derived from `files` array (same source as category list). Toast uses actual classified count. Drive analysis shows "instant" badge for same-drive moves.
+- **v0.5.3**: Test AI button — Scanner page has "Test AI" link that sends 5 sample paths to Gemini and shows model name, per-file category/confidence/reason. Added `gemini:test` IPC channel.
+- **v0.5.4**: Destination folder picker — Organizer shows Source → Destination layout with editable path input that saves to settings on blur.
 
 ### Pages
 1. **Dashboard** — gradient stat cards, storage donut, recent activity, quick actions

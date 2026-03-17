@@ -608,7 +608,7 @@ function PlanSummaryCard({ analysis, t, organizedRoot }: { analysis: PlanAnalysi
       )}
 
       {/* Drive breakdown */}
-      {analysis.sourceDrives.length > 1 && (
+      {analysis.sourceDrives.length > 0 && (
         <div>
           <div className="text-xs text-faint uppercase tracking-wider mb-2">{t('organizer.driveAnalysis')}</div>
           <div className="grid gap-2">
@@ -619,11 +619,13 @@ function PlanSummaryCard({ analysis, t, organizedRoot }: { analysis: PlanAnalysi
                   <span className="text-faint">{drive.fileCount} {t('common.files')}</span>
                   <span className="text-faint">({formatBytes(drive.totalBytes)})</span>
                 </div>
-                {drive.isCrossDrive && (
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-warning/20 text-warning">
-                    {t('organizer.crossDriveMoves')}
-                  </span>
-                )}
+                <span className={`text-xs px-2 py-0.5 rounded-full ${
+                  drive.isCrossDrive
+                    ? 'bg-warning/20 text-warning'
+                    : 'bg-success/20 text-success'
+                }`}>
+                  {drive.isCrossDrive ? t('organizer.crossDriveMoves') : t('organizer.sameDriveMoves')}
+                </span>
               </div>
             ))}
           </div>

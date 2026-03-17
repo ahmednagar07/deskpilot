@@ -153,7 +153,8 @@ export default function ScannerPage() {
       if (pending.length > 0) {
         addToast('info', t('scanner.aiNeedsInput'));
       } else {
-        addToast('success', t('scanner.scanComplete', { count: result.ruleClassified + result.geminiClassified }));
+        // Show total classified files in selected folders (matches what the category list displays)
+        addToast('success', t('scanner.scanComplete', { count: classified.length }));
       }
     } catch (err) {
       console.error('Scan failed:', err);
@@ -193,6 +194,14 @@ export default function ScannerPage() {
       addToast('error', t('toast.apiKeySaveFailed'));
     }
   };
+
+  // Compute stats from files array (matches what category list shows)
+  const fileStats = useMemo(() => {
+    const rule = files.filter(f => f.classification_method === 'rule').length;
+    const ai = files.filter(f => f.classification_method === 'gemini').length;
+    const manual = files.filter(f => f.classification_method === 'manual').length;
+    return { total: files.length, rule, ai, manual };
+  }, [files]);
 
   // Group files by category — memoized to avoid re-grouping on every render
   const grouped = useMemo(() => files.reduce<Record<string, ScannedFile[]>>((acc, file) => {
@@ -331,17 +340,24 @@ export default function ScannerPage() {
         </div>
       )}
 
-      {/* Scan Summary */}
-      {scanResult && (
+      {/* Results Summary — derived from files array so stats match the category list */}
+      {(scanResult || files.length > 0) && (
         <div className="v-card p-4 flex items-center gap-6 flex-wrap">
-          <Stat label={t('scanner.discovered')} value={scanResult.totalDiscovered} />
-          <Stat label={t('scanner.ruleClassified')} value={scanResult.ruleClassified} color="text-success" />
-          <Stat label={t('scanner.aiClassified')} value={scanResult.geminiClassified} color="text-accent" />
-          {scanResult.needsReview > 0 && (
-            <Stat label={t('scanner.needsInput')} value={scanResult.needsReview} color="text-warning" />
+          {scanResult && (
+            <Stat label={t('scanner.discovered')} value={scanResult.totalDiscovered} />
           )}
-          <Stat label={t('scanner.unclassified')} value={scanResult.unclassified} color="text-faint" />
-          {scanResult.errors.length > 0 && (
+          <Stat label={t('scanner.ruleClassified')} value={fileStats.rule} color="text-success" />
+          <Stat label={t('scanner.aiClassified')} value={fileStats.ai} color="text-accent" />
+          {fileStats.manual > 0 && (
+            <Stat label="Manual" value={fileStats.manual} color="text-blue-400" />
+          )}
+          {reviewItems.length > 0 && (
+            <Stat label={t('scanner.needsInput')} value={reviewItems.length} color="text-warning" />
+          )}
+          {scanResult && scanResult.unclassified > 0 && (
+            <Stat label={t('scanner.unclassified')} value={scanResult.unclassified} color="text-faint" />
+          )}
+          {scanResult && scanResult.errors.length > 0 && (
             <Stat label={t('scanner.errors')} value={scanResult.errors.length} color="text-danger" />
           )}
         </div>

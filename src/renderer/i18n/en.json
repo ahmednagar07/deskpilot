@@ -41,7 +41,8 @@
     "smartMoves": "Smart file moves",
     "reclaimSpace": "Reclaim space",
     "totalFilesLabel": "total files",
-    "smartDesc": "Smart desktop file management. Scan, classify, and organize your files with AI-powered intelligence."
+    "smartDesc": "Smart desktop file management. Scan, classify, and organize your files with AI-powered intelligence.",
+    "noDrives": "No drives detected."
   },
   "storage": {
     "title": "Storage Analyzer",
@@ -84,7 +85,9 @@
     "chooseCategory": "Choose a category:",
     "bestGuess": "(best guess)",
     "showAllCategories": "Show all categories...",
-    "scanComplete": "Scan complete: {{count}} files classified"
+    "scanComplete": "Scan complete: {{count}} files classified",
+    "classified": "Classified as {{category}}",
+    "aiNeedsInputDesc": "I'm not sure about {{count}} file(s). Help me classify them correctly."
   },
   "organizer": {
     "title": "Auto-Organizer",
@@ -129,7 +132,9 @@
     "proceedMove": "Proceed with Move",
     "batchTooLarge": "Too many files to approve at once. Please approve by category (max {{max}} at a time).",
     "approveCategory": "Approve",
-    "filesInCategory": "{{count}} files"
+    "filesInCategory": "{{count}} files",
+    "allFilenamesClean": "All filenames are already clean",
+    "renamePartial": "Renamed {{succeeded}} files, {{failed}} failed"
   },
   "search": {
     "title": "Search",
@@ -187,7 +192,7 @@
     "language": "Language",
     "languageHint": "Choose your preferred display language.",
     "remove": "Remove",
-    "configure": "Configure"
+    "configure": "Configure DeskPilot preferences."
   },
   "wizard": {
     "welcome": "Welcome to DeskPilot",
@@ -210,7 +215,18 @@
     "scanFailed": "File scan failed. Check logs for details.",
     "planFailed": "Failed to generate move plan. Check logs for details.",
     "moveFailed": "File move execution failed",
-    "apiKeySaved": "API key saved"
+    "apiKeySaved": "API key saved",
+    "apiKeySaveFailed": "Failed to save API key",
+    "folderAdded": "Folder added",
+    "folderAddFailed": "Failed to add folder",
+    "folderRemoved": "Folder removed",
+    "folderRemoveFailed": "Failed to remove folder",
+    "folderUpdateFailed": "Failed to update folder",
+    "settingsLoadFailed": "Failed to load settings",
+    "scanRunning": "Running scan...",
+    "scanComplete": "Auto-scan complete",
+    "renameFailed": "Batch rename failed",
+    "classifyFailed": "Failed to classify file"
   },
   "common": {
     "files": "files",
@@ -220,6 +236,7 @@
     "save": "Save",
     "delete": "Delete",
     "confirm": "Confirm",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "folders": "folders"
   }
 }

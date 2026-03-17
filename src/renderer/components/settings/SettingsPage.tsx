@@ -43,7 +43,7 @@ export default function SettingsPage() {
       window.api?.on('updater:available', () => setUpdateStatus('available')),
       window.api?.on('updater:not-available', () => {
         setUpdateStatus('not-available');
-        addToast('info', 'You are on the latest version');
+        addToast('info', t('toast.upToDate'));
       }),
       window.api?.on('updater:download-progress', (...args: unknown[]) => {
         setUpdateStatus('downloading');
@@ -52,7 +52,7 @@ export default function SettingsPage() {
       }),
       window.api?.on('updater:downloaded', () => {
         setUpdateStatus('downloaded');
-        addToast('success', 'Update downloaded — ready to install');
+        addToast('success', t('toast.updateDownloaded'));
       }),
       window.api?.on('updater:error', () => {
         setUpdateStatus('error');
@@ -89,7 +89,7 @@ export default function SettingsPage() {
       setLastAutoScan(lastRun);
     } catch (err) {
       console.error('Failed to load settings:', err);
-      addToast('error', 'Failed to load settings');
+      addToast('error', t('toast.settingsLoadFailed'));
     }
   };
 
@@ -100,9 +100,9 @@ export default function SettingsPage() {
       setHasGeminiKey(true);
       setApiKeyInput('');
       setShowApiForm(false);
-      addToast('success', 'API key saved successfully');
+      addToast('success', t('toast.apiKeySaved'));
     } catch {
-      addToast('error', 'Failed to save API key');
+      addToast('error', t('toast.apiKeySaveFailed'));
     }
   };
 
@@ -117,9 +117,9 @@ export default function SettingsPage() {
       setNewFolderPath('');
       setNewFolderLabel('');
       await loadData();
-      addToast('success', 'Folder added');
+      addToast('success', t('toast.folderAdded'));
     } catch {
-      addToast('error', 'Failed to add folder');
+      addToast('error', t('toast.folderAddFailed'));
     }
   };
 
@@ -127,9 +127,9 @@ export default function SettingsPage() {
     try {
       await window.api.invoke('settings:set-folders', 'remove', { id });
       await loadData();
-      addToast('info', 'Folder removed');
+      addToast('info', t('toast.folderRemoved'));
     } catch {
-      addToast('error', 'Failed to remove folder');
+      addToast('error', t('toast.folderRemoveFailed'));
     }
   };
 
@@ -141,7 +141,7 @@ export default function SettingsPage() {
       });
       await loadData();
     } catch {
-      addToast('error', 'Failed to update folder');
+      addToast('error', t('toast.folderUpdateFailed'));
     }
   };
 
@@ -162,13 +162,13 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6 max-w-2xl">
       <div>
-        <h1 className="text-2xl font-bold text-foreground font-[Sora]">Settings</h1>
-        <p className="text-muted text-sm mt-1">Configure DeskPilot preferences.</p>
+        <h1 className="text-2xl font-bold text-foreground font-[Sora]">{t('settings.title')}</h1>
+        <p className="text-muted text-sm mt-1">{t('settings.configure')}</p>
       </div>
 
       {/* Managed Folders */}
       <div className="v-card p-5">
-        <h2 className="section-label mb-4">Managed Folders</h2>
+        <h2 className="section-label mb-4">{t('settings.managedFolders')}</h2>
         <div className="space-y-2 mb-4">
           {folders.map(folder => (
             <div key={folder.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-hover/50">
@@ -187,7 +187,7 @@ export default function SettingsPage() {
                 onClick={() => handleRemoveFolder(folder.id)}
                 className="text-xs text-danger px-2 py-1 rounded-lg hover:bg-danger/10 hover:text-red-400 transition-colors cursor-pointer"
               >
-                Remove
+                {t('settings.remove')}
               </button>
             </div>
           ))}
@@ -199,41 +199,40 @@ export default function SettingsPage() {
             type="text"
             value={newFolderPath}
             onChange={(e) => setNewFolderPath(e.target.value)}
-            placeholder="Folder path (e.g., C:/Users/..."
+            placeholder={t('settings.folderPath')}
             className="flex-1 px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground placeholder:text-faint focus:outline-none focus:border-accent"
           />
           <input
             type="text"
             value={newFolderLabel}
             onChange={(e) => setNewFolderLabel(e.target.value)}
-            placeholder="Label"
+            placeholder={t('settings.label')}
             className="w-28 px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground placeholder:text-faint focus:outline-none focus:border-accent"
           />
           <button
             onClick={handleAddFolder}
             className="btn-primary rounded-xl px-4 py-2 text-sm font-medium cursor-pointer"
           >
-            Add
+            {t('settings.add')}
           </button>
         </div>
       </div>
 
       {/* Gemini API Key */}
       <div className="v-card p-5">
-        <h2 className="section-label mb-2">Gemini AI</h2>
+        <h2 className="section-label mb-2">{t('settings.geminiAi')}</h2>
         <p className="text-xs text-faint mb-3">
-          Used for classifying ambiguous files that don't match any rule.
-          Key is encrypted and stored locally.
+          {t('settings.geminiDesc')}
         </p>
 
         {hasGeminiKey ? (
           <div className="flex items-center gap-3">
-            <span className="text-xs text-success">API key configured</span>
+            <span className="text-xs text-success">{t('settings.apiKeyConfigured')}</span>
             <button
               onClick={() => { setShowApiForm(true); setHasGeminiKey(false); }}
               className="text-xs text-faint hover:text-muted cursor-pointer"
             >
-              Change
+              {t('settings.change')}
             </button>
           </div>
         ) : showApiForm ? (
@@ -242,20 +241,20 @@ export default function SettingsPage() {
               type="password"
               value={apiKeyInput}
               onChange={(e) => setApiKeyInput(e.target.value)}
-              placeholder="Paste Gemini API key..."
+              placeholder={t('settings.geminiAi') + ' API key...'}
               className="flex-1 px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground placeholder:text-faint focus:outline-none focus:border-accent"
             />
             <button
               onClick={handleSaveApiKey}
               className="btn-primary rounded-xl px-4 py-2 text-sm font-medium cursor-pointer"
             >
-              Save
+              {t('common.save')}
             </button>
             <button
               onClick={() => setShowApiForm(false)}
               className="px-3 py-2 text-faint text-sm cursor-pointer hover:text-muted"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         ) : (
@@ -263,28 +262,28 @@ export default function SettingsPage() {
             onClick={() => setShowApiForm(true)}
             className="text-sm text-accent hover:text-accent-hover cursor-pointer"
           >
-            + Add API Key
+            {t('scanner.addApiKey')}
           </button>
         )}
       </div>
 
       {/* Organization Settings */}
       <div className="v-card p-5">
-        <h2 className="section-label mb-4">Organization</h2>
+        <h2 className="section-label mb-4">{t('settings.organization')}</h2>
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-faint block mb-1">Organized Root Folder</label>
+            <label className="text-xs text-faint block mb-1">{t('settings.organizedRoot')}</label>
             <input
               type="text"
               value={(settings.organized_root as string) || ''}
               onChange={(e) => handleSaveSetting('organized_root', e.target.value)}
               className="w-full px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground font-mono focus:outline-none focus:border-accent"
             />
-            <p className="text-xs text-faint mt-1">Files will be organized into subfolders under this path.</p>
+            <p className="text-xs text-faint mt-1">{t('settings.organizedRootHint')}</p>
           </div>
 
           <div>
-            <label className="text-xs text-faint block mb-1">Scan Depth</label>
+            <label className="text-xs text-faint block mb-1">{t('settings.scanDepth')}</label>
             <input
               type="number"
               value={(settings.scan_depth as number) || 5}
@@ -293,7 +292,7 @@ export default function SettingsPage() {
               max={20}
               className="w-20 px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground focus:outline-none focus:border-accent"
             />
-            <p className="text-xs text-faint mt-1">How deep to scan into folder hierarchies.</p>
+            <p className="text-xs text-faint mt-1">{t('settings.scanDepthHint')}</p>
           </div>
         </div>
       </div>
@@ -310,7 +309,7 @@ export default function SettingsPage() {
                 const hours = parseInt(e.target.value, 10);
                 setAutoScanInterval(hours);
                 await window.api.invoke('auto-scan:set-interval', hours);
-                addToast('success', hours > 0 ? `Auto-scan set to every ${hours}h` : 'Auto-scan disabled');
+                addToast('success', hours > 0 ? t('settings.scanEvery', { hours: String(hours) }) : t('settings.scanDisabled'));
               }}
               className="px-3 py-2 bg-card border border-edge rounded-xl text-sm text-foreground cursor-pointer focus:outline-none focus:border-accent"
             >
@@ -329,11 +328,11 @@ export default function SettingsPage() {
           )}
           <button
             onClick={async () => {
-              addToast('info', 'Running scan...');
+              addToast('info', t('toast.scanRunning'));
               await window.api.invoke('auto-scan:run-now');
               const lr = await window.api.invoke('auto-scan:last-run') as string | null;
               setLastAutoScan(lr);
-              addToast('success', 'Auto-scan complete');
+              addToast('success', t('toast.scanComplete'));
             }}
             className="text-sm text-accent hover:text-accent-hover cursor-pointer"
           >
@@ -344,18 +343,18 @@ export default function SettingsPage() {
 
       {/* Appearance */}
       <div className="v-card p-5">
-        <h2 className="section-label mb-4">Appearance</h2>
+        <h2 className="section-label mb-4">{t('settings.appearance')}</h2>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <p className="text-sm text-foreground font-medium">Theme</p>
-            <p className="text-xs text-faint mt-0.5">Switch between dark and light mode.</p>
+            <p className="text-sm text-foreground font-medium">{t('settings.theme')}</p>
+            <p className="text-xs text-faint mt-0.5">{t('settings.themeHint')}</p>
           </div>
           <ThemeToggle />
         </div>
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-foreground font-medium">Language</p>
-            <p className="text-xs text-faint mt-0.5">Choose your preferred display language.</p>
+            <p className="text-sm text-foreground font-medium">{t('settings.language')}</p>
+            <p className="text-xs text-faint mt-0.5">{t('settings.languageHint')}</p>
           </div>
           <LanguageSelector />
         </div>
@@ -363,20 +362,20 @@ export default function SettingsPage() {
 
       {/* Updates */}
       <div className="v-card p-5">
-        <h2 className="section-label mb-3">Updates</h2>
+        <h2 className="section-label mb-3">{t('settings.updates')}</h2>
         <div className="flex items-center gap-4">
           {updateStatus === 'idle' && (
             <button
               onClick={() => window.api?.invoke('updater:check')}
               className="btn-primary rounded-xl px-5 py-2.5 text-sm font-medium cursor-pointer"
             >
-              Check for Updates
+              {t('settings.checkForUpdates')}
             </button>
           )}
           {updateStatus === 'checking' && (
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-              <span className="text-sm text-muted">Checking for updates...</span>
+              <span className="text-sm text-muted">{t('settings.checkingUpdates')}</span>
             </div>
           )}
           {updateStatus === 'available' && (
@@ -384,13 +383,13 @@ export default function SettingsPage() {
               onClick={() => window.api?.invoke('updater:download')}
               className="btn-primary rounded-xl px-5 py-2.5 text-sm font-medium cursor-pointer"
             >
-              Download Update
+              {t('settings.downloadUpdate')}
             </button>
           )}
           {updateStatus === 'downloading' && (
             <div className="flex-1">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-sm text-muted">Downloading update...</span>
+                <span className="text-sm text-muted">{t('settings.downloadingUpdate')}</span>
                 <span className="text-xs font-mono text-accent">{downloadProgress}%</span>
               </div>
               <div className="w-full h-2 bg-edge/30 rounded-full overflow-hidden">
@@ -410,7 +409,7 @@ export default function SettingsPage() {
               className="rounded-xl px-5 py-2.5 text-sm font-semibold cursor-pointer text-white"
               style={{ background: 'linear-gradient(135deg, #10B981, #059669)' }}
             >
-              Install & Restart
+              {t('settings.installRestart')}
             </button>
           )}
           {updateStatus === 'not-available' && (
@@ -418,23 +417,23 @@ export default function SettingsPage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2">
                 <path d="M20 6L9 17l-5-5" />
               </svg>
-              <span className="text-sm text-muted">Up to date</span>
+              <span className="text-sm text-muted">{t('settings.upToDate')}</span>
               <button
                 onClick={() => setUpdateStatus('idle')}
                 className="text-xs text-faint hover:text-muted cursor-pointer ml-2"
               >
-                Check again
+                {t('settings.checkAgain')}
               </button>
             </div>
           )}
           {updateStatus === 'error' && (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-danger">Update check failed</span>
+              <span className="text-sm text-danger">{t('settings.updateCheckFailed')}</span>
               <button
                 onClick={() => { setUpdateStatus('idle'); }}
                 className="text-xs text-faint hover:text-muted cursor-pointer"
               >
-                Retry
+                {t('settings.retry')}
               </button>
             </div>
           )}
@@ -443,13 +442,13 @@ export default function SettingsPage() {
 
       {/* About */}
       <div className="v-card p-5 bg-gradient-to-br from-card to-surface/50">
-        <h2 className="section-label mb-2">About</h2>
+        <h2 className="section-label mb-2">{t('settings.about')}</h2>
         <p className="text-sm">
           <span className="bg-gradient-to-r from-accent to-purple-400 bg-clip-text text-transparent font-bold">DeskPilot</span>
           {' '}
           <span className="font-mono text-xs text-muted">v{appVersion}</span>
         </p>
-        <p className="text-xs text-faint mt-1">Smart desktop file management. Never deletes without asking.</p>
+        <p className="text-xs text-faint mt-1">{t('app.tagline')}</p>
       </div>
     </div>
   );

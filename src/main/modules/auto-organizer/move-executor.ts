@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
+import { shell } from 'electron';
 import * as fileRepo from '../../database/repositories/file-repo';
 import * as moveLogRepo from '../../database/repositories/move-log-repo';
 import { resolveCollision } from './name-suggester';
@@ -139,6 +140,6 @@ async function crossDriveMove(source: string, dest: string): Promise<void> {
     throw new Error(`Size mismatch after copy: ${srcStat.size} vs ${dstStat.size}`);
   }
 
-  // Delete source only after verified copy
-  await fs.promises.unlink(source);
+  // Send source to Recycle Bin after verified copy (recoverable, not permanent delete)
+  await shell.trashItem(source);
 }

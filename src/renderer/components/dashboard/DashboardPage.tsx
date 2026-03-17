@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../utils/format';
 
 interface DashboardData {
   fileCount: number;
@@ -7,14 +8,6 @@ interface DashboardData {
   recentActivity: Array<{ id: number; source_path: string; dest_path: string; operation: string; executed_at: string }>;
   drives: Array<{ path: string; totalBytes: number; freeBytes: number; usedBytes: number }>;
   watchedFolders: number;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 const STAT_THEMES = [
@@ -195,7 +188,7 @@ export default function DashboardPage() {
           { label: t('dashboard.trackedFiles'), value: data.fileCount },
           { label: t('dashboard.totalSize'), value: formatBytes(totalTrackedSize) },
           { label: t('dashboard.categories'), value: data.byCategory.filter(c => c.count > 0).length },
-          { label: t('dashboard.watching'), value: `${data.watchedFolders} ${t('common.files')}` },
+          { label: t('dashboard.watching'), value: `${data.watchedFolders} ${t('common.folders')}` },
         ].map((stat, i) => (
           <div key={stat.label} className="stat-card"
             style={{ '--stat-bar': STAT_THEMES[i].bar, '--stat-glow': STAT_THEMES[i].glow, '--stat-shadow': STAT_THEMES[i].shadow } as React.CSSProperties}>
@@ -223,10 +216,10 @@ export default function DashboardPage() {
                 size={120}
                 strokeWidth={16}
                 centerLabel={`${usedPct}%`}
-                centerSub="used"
+                centerSub={t('storage.used')}
                 segments={[
-                  { label: 'Used', value: primary.usedBytes, color: isLow ? '#FF4D6A' : usedPct > 75 ? '#F0C246' : '#2DD4A8' },
-                  { label: 'Free', value: primary.freeBytes, color: '#1a1a2e' },
+                  { label: t('storage.used'), value: primary.usedBytes, color: isLow ? '#FF4D6A' : usedPct > 75 ? '#F0C246' : '#2DD4A8' },
+                  { label: t('storage.free'), value: primary.freeBytes, color: 'var(--t-donut-track)' },
                 ]}
               />
             );
@@ -240,7 +233,7 @@ export default function DashboardPage() {
                   <div className="flex justify-between text-xs mb-2">
                     <span className="text-foreground font-medium font-mono text-[13px]">{drive.path.replace('/', '')}</span>
                     <span className={isLow ? 'text-danger font-medium' : 'text-faint'}>
-                      {formatBytes(drive.freeBytes)} free
+                      {formatBytes(drive.freeBytes)} {t('storage.free')}
                     </span>
                   </div>
                   <div className="progress-bar">
@@ -254,7 +247,7 @@ export default function DashboardPage() {
               );
             })}
             {data.drives.length === 0 && (
-              <p className="text-sm text-faint">No drives detected.</p>
+              <p className="text-sm text-faint">{t('dashboard.noDrives')}</p>
             )}
           </div>
         </div>
@@ -267,7 +260,7 @@ export default function DashboardPage() {
               size={180}
               strokeWidth={22}
               centerLabel={String(data.byCategory.reduce((s, c) => s + c.count, 0))}
-              centerSub="total files"
+              centerSub={t('dashboard.totalFilesLabel')}
               segments={data.byCategory
                 .filter(c => c.count > 0)
                 .sort((a, b) => b.count - a.count)
@@ -295,8 +288,7 @@ export default function DashboardPage() {
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" className="text-faint/30 mb-3">
                   <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
                 </svg>
-                <p className="text-sm text-faint">No files scanned yet</p>
-                <p className="text-xs text-faint/60 mt-1">Go to Scanner to start</p>
+                <p className="text-sm text-faint">{t('dashboard.noFilesYet')}</p>
               </div>
             )}
           </div>
@@ -337,6 +329,7 @@ export default function DashboardPage() {
 }
 
 function WelcomeDashboard() {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-center justify-center h-full min-h-[500px]">
       {/* Hero glow */}
@@ -354,17 +347,17 @@ function WelcomeDashboard() {
       </div>
 
       <h1 className="text-3xl font-bold mb-2" style={{ fontFamily: 'Sora, sans-serif', background: 'linear-gradient(90deg, var(--t-title-gradient-from), var(--t-title-gradient-to))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-        Welcome to DeskPilot
+        {t('dashboard.welcome')}
       </h1>
       <p className="text-muted text-center max-w-md mb-10">
-        Smart desktop file management. Scan, classify, and organize your files with AI-powered intelligence.
+        {t('dashboard.smartDesc')}
       </p>
 
       <div className="grid grid-cols-3 gap-5 max-w-xl w-full">
         {[
-          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>, label: 'Scan Files', desc: 'Discover & classify' },
-          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, label: 'Organize', desc: 'Smart file moves' },
-          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>, label: 'Clean Up', desc: 'Reclaim space' },
+          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>, label: t('dashboard.scanFilesAction'), desc: t('dashboard.discoverClassify') },
+          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>, label: t('nav.organize'), desc: t('dashboard.smartMoves') },
+          { icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/></svg>, label: t('dashboard.reclaimSpace'), desc: t('dashboard.reclaimSpace') },
         ].map(item => (
           <div key={item.label} className="v-card p-5 flex flex-col items-center text-center gap-3">
             <div className="text-accent/60">{item.icon}</div>

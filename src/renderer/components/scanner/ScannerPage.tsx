@@ -3,6 +3,7 @@ import { useScanStore, ScannedFile, ScanResult, ReviewItem } from '../../stores/
 import { useToastStore } from '../../stores/toast-store';
 import { useIpcEvent } from '../../hooks/useIpc';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../utils/format';
 
 const CATEGORY_ICONS: Record<string, React.ReactNode> = {
   clients: (
@@ -82,14 +83,6 @@ const CATEGORY_NAMES: Record<string, string> = {
   archive: 'Archive',
 };
 
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-}
-
 export default function ScannerPage() {
   const { t } = useI18n();
   const {
@@ -158,7 +151,7 @@ export default function ScannerPage() {
       setReviewItems(pending);
 
       if (pending.length > 0) {
-        addToast('info', `AI needs your help with ${pending.length} file${pending.length > 1 ? 's' : ''}`);
+        addToast('info', t('scanner.aiNeedsInput'));
       } else {
         addToast('success', t('scanner.scanComplete', { count: classified.length }));
       }
@@ -175,16 +168,16 @@ export default function ScannerPage() {
     try {
       const success = await window.api.invoke('scanner:resolve-review', filePath, categorySlug);
       if (!success) {
-        addToast('error', `Category "${categorySlug}" not found — could not classify`);
+        addToast('error', t('toast.classifyFailed'));
         return;
       }
       removeReviewItem(filePath);
       // Refresh files list
       const classified = await window.api.invoke('scanner:result') as ScannedFile[];
       setFiles(classified);
-      addToast('success', `Classified as ${CATEGORY_NAMES[categorySlug] || categorySlug}`);
+      addToast('success', t('scanner.classified', { category: CATEGORY_NAMES[categorySlug] || categorySlug }));
     } catch (err) {
-      addToast('error', 'Failed to classify file');
+      addToast('error', t('toast.classifyFailed'));
     }
   };
 
@@ -197,7 +190,7 @@ export default function ScannerPage() {
       setShowApiKeyForm(false);
       addToast('success', t('toast.apiKeySaved'));
     } catch (err) {
-      addToast('error', 'Failed to save API key');
+      addToast('error', t('toast.apiKeySaveFailed'));
     }
   };
 
@@ -282,13 +275,13 @@ export default function ScannerPage() {
                       onClick={handleSaveApiKey}
                       className="px-3 py-1.5 btn-primary rounded-xl text-xs font-medium cursor-pointer"
                     >
-                      Save Key
+                      {t('common.save')}
                     </button>
                     <button
                       onClick={() => setShowApiKeyForm(false)}
                       className="px-3 py-1.5 text-faint text-xs cursor-pointer hover:text-muted"
                     >
-                      Cancel
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -369,7 +362,7 @@ export default function ScannerPage() {
             <div>
               <h2 className="text-lg font-bold text-foreground font-[Sora]">{t('scanner.aiNeedsInput')}</h2>
               <p className="text-xs text-muted">
-                I'm not sure about {reviewItems.length} file{reviewItems.length > 1 ? 's' : ''}. Help me classify {reviewItems.length > 1 ? 'them' : 'it'} correctly.
+                {t('scanner.aiNeedsInputDesc', { count: reviewItems.length })}
               </p>
             </div>
           </div>
@@ -524,8 +517,9 @@ function Stat({ label, value, color }: { label: string; value: number; color?: s
 }
 
 const CategoryGroup = React.memo(function CategoryGroup({ slug, items }: { slug: string; items: ScannedFile[] }) {
+  const { t } = useI18n();
   const [expanded, setExpanded] = useState(false);
-  const name = items[0]?.category_name || 'Uncategorized';
+  const name = items[0]?.category_name || t('scanner.unclassified');
   const color = items[0]?.category_color || '#6B7280';
   const icon = CATEGORY_ICONS[slug] || FALLBACK_ICON;
   const totalSize = items.reduce((sum, f) => sum + f.size_bytes, 0);
@@ -545,7 +539,7 @@ const CategoryGroup = React.memo(function CategoryGroup({ slug, items }: { slug:
           {icon}
           <span className="section-label">{name}</span>
           <span className="text-xs text-faint bg-surface/50 px-2 py-0.5 rounded-xl">
-            {items.length} files
+            {items.length} {t('common.files')}
           </span>
           {ruleCount > 0 && (
             <span className="text-xs text-success bg-success/10 px-2 py-0.5 rounded-xl">

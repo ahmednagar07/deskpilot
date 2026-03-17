@@ -40,6 +40,21 @@ export function getUnorganizedFiles(): TrackedFile[] {
   return db.prepare('SELECT * FROM tracked_files WHERE is_organized = 0').all() as TrackedFile[];
 }
 
+/**
+ * Get unorganized files scoped to specific folder paths.
+ * Only returns files whose current_path starts with one of the given prefixes.
+ */
+export function getUnorganizedFilesInFolders(folderPaths: string[]): TrackedFile[] {
+  if (folderPaths.length === 0) return [];
+  const db = getDatabase();
+  const conditions = folderPaths.map(() => 'current_path LIKE ?').join(' OR ');
+  const params = folderPaths.map(p => {
+    const normalized = p.replace(/\\/g, '/').replace(/\/$/, '');
+    return `${normalized}/%`;
+  });
+  return db.prepare(`SELECT * FROM tracked_files WHERE is_organized = 0 AND (${conditions})`).all(...params) as TrackedFile[];
+}
+
 export function updateFileCategory(id: number, categoryId: number, method: string, confidence: number): void {
   const db = getDatabase();
   db.prepare(`

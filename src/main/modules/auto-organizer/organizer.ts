@@ -3,18 +3,23 @@ import fs from 'fs';
 import os from 'os';
 import * as fileRepo from '../../database/repositories/file-repo';
 import * as settingsRepo from '../../database/repositories/settings-repo';
+import * as scanRepo from '../../database/repositories/scan-repo';
 import { getCategoryById } from '../file-classifier/categories';
 import { suggestBetterName } from './name-suggester';
 import { MovePlanItem } from '../../../shared/types';
 
 /**
- * Generate a move plan for all unorganized, classified files.
- * Each plan item maps: current path → destination path (based on category target_path).
+ * Generate a move plan for unorganized, classified files.
+ * SCOPED to active managed folders only — never pulls files from outside.
  */
 export function generateMovePlan(): MovePlanItem[] {
   const fallbackRoot = path.join(os.homedir(), 'Documents', 'Organized').replace(/\\/g, '/');
   const organizedRoot = settingsRepo.getSetting<string>('organized_root') || fallbackRoot;
-  const files = fileRepo.getUnorganizedFiles();
+
+  // Only include files from active managed folders
+  const activeFolders = scanRepo.getActiveManagedFolders();
+  const folderPaths = activeFolders.map(f => f.path);
+  const files = fileRepo.getUnorganizedFilesInFolders(folderPaths);
   const plan: MovePlanItem[] = [];
 
   for (const file of files) {

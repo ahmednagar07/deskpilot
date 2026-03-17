@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useOrganizerStore, UndoSession } from '../../stores/organizer-store';
 import { useToastStore } from '../../stores/toast-store';
 import { useI18n } from '../../i18n';
+import { formatBytes } from '../../utils/format';
 import { MovePlanItem, Category } from '../../../shared/types';
 
 interface PlanAnalysis {
@@ -14,14 +15,6 @@ interface PlanAnalysis {
   sameDriveCount: number;
   spaceOk: boolean;
   spaceNeeded: number;
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
 function shortPath(p: string): string {
@@ -224,13 +217,13 @@ export default function OrganizerPage() {
       const preview = await window.api.invoke('batch-rename:preview', filePaths) as Array<{ path: string; original: string; suggested: string | null }>;
       const withSuggestions = preview.filter(p => p.suggested !== null);
       if (withSuggestions.length === 0) {
-        addToast('info', 'All filenames are already clean');
+        addToast('info', t('organizer.allFilenamesClean'));
         return;
       }
       setRenamePreview(withSuggestions);
     } catch (err) {
       console.error('Batch rename preview failed:', err);
-      addToast('error', 'Failed to generate rename suggestions');
+      addToast('error', t('toast.renameFailed'));
     }
   };
 
@@ -245,14 +238,14 @@ export default function OrganizerPage() {
       const succeeded = results.filter(r => r.success).length;
       const failed = results.filter(r => !r.success).length;
       if (failed > 0) {
-        addToast('warning', `Renamed ${succeeded} files, ${failed} failed`);
+        addToast('warning', t('organizer.renamePartial', { succeeded, failed }));
       } else {
-        addToast('success', `Renamed ${succeeded} files`);
+        addToast('success', t('organizer.renameFiles', { count: succeeded }));
       }
       setRenamePreview(null);
     } catch (err) {
       console.error('Batch rename failed:', err);
-      addToast('error', 'Batch rename failed');
+      addToast('error', t('toast.renameFailed'));
     } finally {
       setIsRenaming(false);
     }

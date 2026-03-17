@@ -41,7 +41,8 @@
     "smartMoves": "نقل ذكي للملفات",
     "reclaimSpace": "استعادة المساحة",
     "totalFilesLabel": "إجمالي الملفات",
-    "smartDesc": "إدارة ذكية لملفات سطح المكتب. افحص وصنف ونظم ملفاتك بالذكاء الاصطناعي."
+    "smartDesc": "إدارة ذكية لملفات سطح المكتب. افحص وصنف ونظم ملفاتك بالذكاء الاصطناعي.",
+    "noDrives": "لم يتم اكتشاف أقراص."
   },
   "storage": {
     "title": "محلل التخزين",
@@ -84,7 +85,9 @@
     "chooseCategory": "اختر فئة:",
     "bestGuess": "(أفضل تخمين)",
     "showAllCategories": "عرض كل الفئات...",
-    "scanComplete": "اكتمل الفحص: {{count}} ملف مصنف"
+    "scanComplete": "اكتمل الفحص: {{count}} ملف مصنف",
+    "classified": "تم التصنيف كـ {{category}}",
+    "aiNeedsInputDesc": "لست متأكداً من {{count}} ملف(ات). ساعدني في تصنيفها بشكل صحيح."
   },
   "organizer": {
     "title": "المنظم التلقائي",
@@ -129,7 +132,9 @@
     "proceedMove": "المتابعة بالنقل",
     "batchTooLarge": "عدد الملفات كبير جداً للموافقة دفعة واحدة. يرجى الموافقة حسب الفئة ({{max}} كحد أقصى).",
     "approveCategory": "موافقة",
-    "filesInCategory": "{{count}} ملف"
+    "filesInCategory": "{{count}} ملف",
+    "allFilenamesClean": "جميع أسماء الملفات نظيفة بالفعل",
+    "renamePartial": "تمت إعادة تسمية {{succeeded}} ملف، فشل {{failed}}"
   },
   "search": {
     "title": "البحث",
@@ -187,7 +192,7 @@
     "language": "اللغة",
     "languageHint": "اختر لغة العرض المفضلة.",
     "remove": "إزالة",
-    "configure": "تكوين"
+    "configure": "تكوين تفضيلات DeskPilot."
   },
   "wizard": {
     "welcome": "مرحباً بك في DeskPilot",
@@ -210,7 +215,18 @@
     "scanFailed": "فشل فحص الملفات. تحقق من السجلات للتفاصيل.",
     "planFailed": "فشل إنشاء خطة النقل.",
     "moveFailed": "فشل تنفيذ نقل الملفات",
-    "apiKeySaved": "تم حفظ مفتاح API"
+    "apiKeySaved": "تم حفظ مفتاح API",
+    "apiKeySaveFailed": "فشل حفظ مفتاح API",
+    "folderAdded": "تمت إضافة المجلد",
+    "folderAddFailed": "فشل إضافة المجلد",
+    "folderRemoved": "تمت إزالة المجلد",
+    "folderRemoveFailed": "فشل إزالة المجلد",
+    "folderUpdateFailed": "فشل تحديث المجلد",
+    "settingsLoadFailed": "فشل تحميل الإعدادات",
+    "scanRunning": "جاري الفحص...",
+    "scanComplete": "اكتمل الفحص التلقائي",
+    "renameFailed": "فشل إعادة التسمية المجمعة",
+    "classifyFailed": "فشل تصنيف الملف"
   },
   "common": {
     "files": "ملفات",
@@ -220,6 +236,7 @@
     "save": "حفظ",
     "delete": "حذف",
     "confirm": "تأكيد",
-    "loading": "جاري التحميل..."
+    "loading": "جاري التحميل...",
+    "folders": "مجلدات"
   }
 }

@@ -134,7 +134,10 @@
     "approveCategory": "موافقة",
     "filesInCategory": "{{count}} ملف",
     "allFilenamesClean": "جميع أسماء الملفات نظيفة بالفعل",
-    "renamePartial": "تمت إعادة تسمية {{succeeded}} ملف، فشل {{failed}}"
+    "renamePartial": "تمت إعادة تسمية {{succeeded}} ملف، فشل {{failed}}",
+    "selectFolders": "اختر المجلدات للتنظيم",
+    "organizedRoot": "تنظيم في",
+    "filesMovedToSubfolders": "سيتم ترتيب الملفات في مجلدات فرعية حسب الفئة"
   },
   "search": {
     "title": "البحث",

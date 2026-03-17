@@ -55,6 +55,21 @@ export function getUnorganizedFilesInFolders(folderPaths: string[]): TrackedFile
   return db.prepare(`SELECT * FROM tracked_files WHERE is_organized = 0 AND (${conditions})`).all(...params) as TrackedFile[];
 }
 
+/**
+ * Get classified files scoped to specific folder paths.
+ * Returns files that have a category_id, within the given folders.
+ */
+export function getClassifiedFilesInFolders(folderPaths: string[]): TrackedFile[] {
+  if (folderPaths.length === 0) return [];
+  const db = getDatabase();
+  const conditions = folderPaths.map(() => 'current_path LIKE ?').join(' OR ');
+  const params = folderPaths.map(p => {
+    const normalized = p.replace(/\\/g, '/').replace(/\/$/, '');
+    return `${normalized}/%`;
+  });
+  return db.prepare(`SELECT * FROM tracked_files WHERE category_id IS NOT NULL AND (${conditions})`).all(...params) as TrackedFile[];
+}
+
 export function updateFileCategory(id: number, categoryId: number, method: string, confidence: number): void {
   const db = getDatabase();
   db.prepare(`

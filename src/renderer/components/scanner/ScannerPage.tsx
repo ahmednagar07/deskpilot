@@ -142,8 +142,8 @@ export default function ScannerPage() {
       const result = rawResult as ScanResult;
       setScanResult(result);
 
-      // Fetch classified files
-      const classified = await window.api.invoke('scanner:result') as ScannedFile[];
+      // Fetch classified files scoped to selected folders
+      const classified = await window.api.invoke('scanner:result', selectedFolders) as ScannedFile[];
       setFiles(classified);
 
       // Fetch review items (single source of truth — no push event listener)
@@ -153,7 +153,7 @@ export default function ScannerPage() {
       if (pending.length > 0) {
         addToast('info', t('scanner.aiNeedsInput'));
       } else {
-        addToast('success', t('scanner.scanComplete', { count: classified.length }));
+        addToast('success', t('scanner.scanComplete', { count: result.ruleClassified + result.geminiClassified }));
       }
     } catch (err) {
       console.error('Scan failed:', err);
@@ -172,8 +172,8 @@ export default function ScannerPage() {
         return;
       }
       removeReviewItem(filePath);
-      // Refresh files list
-      const classified = await window.api.invoke('scanner:result') as ScannedFile[];
+      // Refresh files list scoped to selected folders
+      const classified = await window.api.invoke('scanner:result', selectedFolders) as ScannedFile[];
       setFiles(classified);
       addToast('success', t('scanner.classified', { category: CATEGORY_NAMES[categorySlug] || categorySlug }));
     } catch (err) {

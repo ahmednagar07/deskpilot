@@ -57,9 +57,27 @@ export default function OrganizerPage() {
   const [renamePreview, setRenamePreview] = useState<Array<{ path: string; original: string; suggested: string | null }> | null>(null);
   const [isRenaming, setIsRenaming] = useState(false);
 
-  // Load undo history on mount
+  // Folder picker state
+  const [managedFolders, setManagedFolders] = useState<Array<{ id: number; path: string; label: string }>>([]);
+  const [selectedFolders, setSelectedFolders] = useState<string[]>([]);
+  const [organizedRoot, setOrganizedRoot] = useState<string>('');
+
+  // Load undo history, managed folders, and organized root on mount
   useEffect(() => {
     loadHistory();
+
+    // Load managed folders
+    window.api.invoke('settings:get-folders').then((folders) => {
+      const f = folders as Array<{ id: number; path: string; label: string; is_active: number }>;
+      const active = f.filter(x => x.is_active);
+      setManagedFolders(active);
+      setSelectedFolders(active.map(x => x.path));
+    });
+
+    // Load organized root
+    window.api.invoke('settings:get', 'organized_root').then((root) => {
+      if (root) setOrganizedRoot(root as string);
+    });
   }, []);
 
   // Load all categories on mount (needed for dock + reclassification)
@@ -88,7 +106,7 @@ export default function OrganizerPage() {
     setExecutionResult(null);
     setAnalysis(null);
     try {
-      const result = await window.api.invoke('organizer:generate-plan') as MovePlanItem[];
+      const result = await window.api.invoke('organizer:generate-plan', selectedFolders) as MovePlanItem[];
       setPlan(result);
 
       // Auto-analyze the plan
@@ -277,11 +295,53 @@ export default function OrganizerPage() {
         </div>
         <button
           onClick={handleGeneratePlan}
-          disabled={isGenerating}
+          disabled={isGenerating || selectedFolders.length === 0}
           className="px-5 py-2.5 btn-primary rounded-xl disabled:opacity-50 text-white font-medium text-sm transition-colors cursor-pointer disabled:cursor-not-allowed"
         >
           {isGenerating ? t('organizer.generating') : t('organizer.generatePlan')}
         </button>
+      </div>
+
+      {/* Folder Selection */}
+      <div className="v-card p-4">
+        <h2 className="section-label mb-3">{t('organizer.selectFolders')}</h2>
+        <div className="space-y-2">
+          {managedFolders.map((folder) => (
+            <label key={folder.id} className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedFolders.includes(folder.path)}
+                onChange={() => {
+                  setSelectedFolders(prev =>
+                    prev.includes(folder.path)
+                      ? prev.filter(p => p !== folder.path)
+                      : [...prev, folder.path]
+                  );
+                }}
+                className="w-4 h-4 rounded accent-accent"
+              />
+              <div className="flex-1 min-w-0">
+                <span className="text-sm text-foreground">{folder.label}</span>
+                <span className="text-xs text-faint font-mono ml-2 truncate">{folder.path}</span>
+              </div>
+            </label>
+          ))}
+          {managedFolders.length === 0 && (
+            <p className="text-sm text-faint">{t('scanner.noFolders')}</p>
+          )}
+        </div>
+        {organizedRoot && (
+          <div className="mt-3 pt-3 border-t border-edge/50">
+            <div className="flex items-center gap-2 text-xs text-muted">
+              <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+              <span>{t('organizer.organizedRoot')}:</span>
+              <span className="font-mono text-foreground">{organizedRoot}</span>
+            </div>
+            <p className="text-xs text-faint mt-1 pl-6">{t('organizer.filesMovedToSubfolders')}</p>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -308,7 +368,7 @@ export default function OrganizerPage() {
         <>
           {/* Plan Summary Card */}
           {analysis && plan.length > 0 && (
-            <PlanSummaryCard analysis={analysis} t={t} />
+            <PlanSummaryCard analysis={analysis} t={t} organizedRoot={organizedRoot} />
           )}
 
           {/* Execution result */}
@@ -493,10 +553,22 @@ export default function OrganizerPage() {
 
 // ─── Plan Summary Card ────────────────────────────────────────────────────────
 
-function PlanSummaryCard({ analysis, t }: { analysis: PlanAnalysis; t: (key: string, vars?: Record<string, string | number>) => string }) {
+function PlanSummaryCard({ analysis, t, organizedRoot }: { analysis: PlanAnalysis; t: (key: string, vars?: Record<string, string | number>) => string; organizedRoot?: string }) {
   return (
     <div className="v-card p-5 space-y-4">
       <h3 className="section-label">{t('organizer.planSummary')}</h3>
+
+      {organizedRoot && (
+        <div className="flex items-center gap-2 text-sm text-muted p-3 rounded-lg bg-accent/5 border border-accent/20">
+          <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+          <span>{t('organizer.organizedRoot')}:</span>
+          <span className="font-mono text-foreground font-medium">{organizedRoot}</span>
+          <span className="text-faint">—</span>
+          <span className="text-faint">{t('organizer.filesMovedToSubfolders')}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <div>

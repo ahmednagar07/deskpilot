@@ -223,8 +223,10 @@ export function resolveReviewItem(filePath: string, categorySlug: string): boole
 /**
  * Get all classified files with their category info for the UI.
  */
-export function getClassifiedFiles(): Array<TrackedFile & { category_name?: string; category_slug?: string; category_color?: string }> {
-  const files = fileRepo.getUnorganizedFiles();
+export function getClassifiedFiles(folderPaths?: string[]): Array<TrackedFile & { category_name?: string; category_slug?: string; category_color?: string }> {
+  const files = folderPaths && folderPaths.length > 0
+    ? fileRepo.getClassifiedFilesInFolders(folderPaths)
+    : fileRepo.getUnorganizedFiles();
   // Build a Map for O(1) lookups instead of O(n) .find() per file
   const catMap = new Map(getCategories().map(c => [c.id, c]));
   return files.map(f => {

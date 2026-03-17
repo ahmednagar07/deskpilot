@@ -12,13 +12,14 @@ import { MovePlanItem } from '../../../shared/types';
  * Generate a move plan for unorganized, classified files.
  * SCOPED to active managed folders only — never pulls files from outside.
  */
-export function generateMovePlan(): MovePlanItem[] {
+export function generateMovePlan(scopeFolderPaths?: string[]): MovePlanItem[] {
   const fallbackRoot = path.join(os.homedir(), 'Documents', 'Organized').replace(/\\/g, '/');
   const organizedRoot = settingsRepo.getSetting<string>('organized_root') || fallbackRoot;
 
-  // Only include files from active managed folders
-  const activeFolders = scanRepo.getActiveManagedFolders();
-  const folderPaths = activeFolders.map(f => f.path);
+  // Use provided folder paths, or fall back to all active managed folders
+  const folderPaths = scopeFolderPaths && scopeFolderPaths.length > 0
+    ? scopeFolderPaths
+    : scanRepo.getActiveManagedFolders().map(f => f.path);
   const files = fileRepo.getUnorganizedFilesInFolders(folderPaths);
   const plan: MovePlanItem[] = [];
 

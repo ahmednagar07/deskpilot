@@ -134,7 +134,10 @@
     "approveCategory": "Approve",
     "filesInCategory": "{{count}} files",
     "allFilenamesClean": "All filenames are already clean",
-    "renamePartial": "Renamed {{succeeded}} files, {{failed}} failed"
+    "renamePartial": "Renamed {{succeeded}} files, {{failed}} failed",
+    "selectFolders": "Select folders to organize",
+    "organizedRoot": "Organized into",
+    "filesMovedToSubfolders": "Files will be sorted into category subfolders"
   },
   "search": {
     "title": "Search",

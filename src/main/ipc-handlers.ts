@@ -192,8 +192,8 @@ export function registerIpcHandlers(): void {
     return true;
   });
 
-  ipcMain.handle(IpcChannels.SCANNER_RESULT, () => {
-    return getClassifiedFiles();
+  ipcMain.handle(IpcChannels.SCANNER_RESULT, (_event, folderPaths?: string[]) => {
+    return getClassifiedFiles(folderPaths);
   });
 
   ipcMain.handle(IpcChannels.SCANNER_IS_RUNNING, () => {
@@ -219,8 +219,8 @@ export function registerIpcHandlers(): void {
   });
 
   // ── Auto-Organizer ─────────────────────────────
-  ipcMain.handle(IpcChannels.ORGANIZER_GENERATE_PLAN, () => {
-    return generateMovePlan();
+  ipcMain.handle(IpcChannels.ORGANIZER_GENERATE_PLAN, (_event, folderPaths?: string[]) => {
+    return generateMovePlan(folderPaths);
   });
 
   ipcMain.handle(IpcChannels.ORGANIZER_EXECUTE, async (_event, approvedItems: MovePlanItem[]) => {

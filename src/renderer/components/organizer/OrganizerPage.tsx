@@ -302,46 +302,69 @@ export default function OrganizerPage() {
         </button>
       </div>
 
-      {/* Folder Selection */}
-      <div className="v-card p-4">
-        <h2 className="section-label mb-3">{t('organizer.selectFolders')}</h2>
-        <div className="space-y-2">
-          {managedFolders.map((folder) => (
-            <label key={folder.id} className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={selectedFolders.includes(folder.path)}
-                onChange={() => {
-                  setSelectedFolders(prev =>
-                    prev.includes(folder.path)
-                      ? prev.filter(p => p !== folder.path)
-                      : [...prev, folder.path]
-                  );
-                }}
-                className="w-4 h-4 rounded accent-accent"
-              />
-              <div className="flex-1 min-w-0">
-                <span className="text-sm text-foreground">{folder.label}</span>
-                <span className="text-xs text-faint font-mono ml-2 truncate">{folder.path}</span>
-              </div>
-            </label>
-          ))}
-          {managedFolders.length === 0 && (
-            <p className="text-sm text-faint">{t('scanner.noFolders')}</p>
-          )}
-        </div>
-        {organizedRoot && (
-          <div className="mt-3 pt-3 border-t border-edge/50">
-            <div className="flex items-center gap-2 text-xs text-muted">
-              <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-              <span>{t('organizer.organizedRoot')}:</span>
-              <span className="font-mono text-foreground">{organizedRoot}</span>
-            </div>
-            <p className="text-xs text-faint mt-1 pl-6">{t('organizer.filesMovedToSubfolders')}</p>
+      {/* Source → Destination */}
+      <div className="v-card p-4 space-y-4">
+        {/* Source folders */}
+        <div>
+          <h2 className="section-label mb-3">{t('organizer.selectFolders')}</h2>
+          <div className="space-y-2">
+            {managedFolders.map((folder) => (
+              <label key={folder.id} className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedFolders.includes(folder.path)}
+                  onChange={() => {
+                    setSelectedFolders(prev =>
+                      prev.includes(folder.path)
+                        ? prev.filter(p => p !== folder.path)
+                        : [...prev, folder.path]
+                    );
+                  }}
+                  className="w-4 h-4 rounded accent-accent"
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="text-sm text-foreground">{folder.label}</span>
+                  <span className="text-xs text-faint font-mono ml-2 truncate">{folder.path}</span>
+                </div>
+              </label>
+            ))}
+            {managedFolders.length === 0 && (
+              <p className="text-sm text-faint">{t('scanner.noFolders')}</p>
+            )}
           </div>
-        )}
+        </div>
+
+        {/* Arrow separator */}
+        <div className="flex items-center gap-3 px-2">
+          <div className="flex-1 border-t border-edge/50" />
+          <svg className="w-5 h-5 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+          </svg>
+          <div className="flex-1 border-t border-edge/50" />
+        </div>
+
+        {/* Destination folder */}
+        <div>
+          <h2 className="section-label mb-2">{t('organizer.organizedRoot')}</h2>
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-accent shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <input
+              type="text"
+              value={organizedRoot}
+              onChange={(e) => setOrganizedRoot(e.target.value)}
+              onBlur={() => {
+                if (organizedRoot.trim()) {
+                  window.api.invoke('settings:set', 'organized_root', organizedRoot.trim());
+                }
+              }}
+              placeholder={t('settings.organizedRootHint')}
+              className="flex-1 px-3 py-1.5 bg-surface border border-edge rounded-lg text-sm text-foreground font-mono placeholder:text-faint focus:outline-none focus:border-accent"
+            />
+          </div>
+          <p className="text-xs text-faint mt-1.5 pl-6">{t('organizer.filesMovedToSubfolders')}</p>
+        </div>
       </div>
 
       {/* Tabs */}

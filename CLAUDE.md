@@ -15,8 +15,16 @@ Electron + React + Tailwind + SQLite + Gemini API.
 - [x] Iteration 9: Background Watcher (2026-03-16)
 - [x] Iteration 10: Dashboard + Settings (2026-03-16)
 
-## Current State — v0.5.4 Scoped Scanning + AI Test + Destination Picker
+## Current State — v0.6.0 Smart Context-Aware Organization
 All 6 pages fully implemented + premium UI + security hardening + light/dark theme + i18n everywhere + scheduled auto-scans + batch rename + cross-platform builds.
+
+### v0.6.0 Smart Organization + Progress Bar (2026-03-17)
+- **Context-aware organization**: Files in client/project paths (detected via `path_contains` rules) are organized into subfolders: `Organized/Clients/LOC/file.pdf` instead of flat `Organized/Documents/file.pdf`. Files without context fall back to type-based folders.
+- **"0 files moved" fix**: Cross-drive `crossDriveMove()` now separates copy success from trash success. If copy succeeds but `shell.trashItem()` fails, move counts as succeeded with a warning — file IS at destination.
+- **Move progress overlay**: Real-time progress bar with percentage, ETA, current file name, and bytes processed/total during file moves.
+- **Browse button**: Native folder picker (`dialog.showOpenDialog`) for destination folder — no more manual path typing.
+- **Better error reporting**: Failed moves show first error reason in the result banner. Warnings shown for files copied but source not trashed.
+- **IPC channels**: Added `organizer:move-progress` (progress events), `dialog:open-folder` (native folder picker).
 
 ### v0.5.x Changes (2026-03-17)
 - **v0.5.1**: Folder-scoped scanning — Scanner and Organizer only process files from selected folders (SQL LIKE scoping). Organizer folder picker with checkboxes.

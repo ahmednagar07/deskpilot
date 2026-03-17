@@ -9,7 +9,7 @@ import * as moveLogRepo from './database/repositories/move-log-repo';
 import { runStorageScan, abortScan, isScanning } from './modules/storage-analyzer/scanner';
 import { cleanupApprovedItems, getDriveInfo } from './modules/storage-analyzer/cleaner';
 import { runClassification, isClassifying, abortClassification, getClassifiedFiles, getPendingReviewItems, resolveReviewItem } from './modules/file-classifier/classifier';
-import { setGeminiApiKey, hasGeminiApiKey } from './modules/file-classifier/gemini-client';
+import { setGeminiApiKey, hasGeminiApiKey, testGeminiConnection } from './modules/file-classifier/gemini-client';
 import { generateMovePlan, checkDiskSpace, analyzePlan } from './modules/auto-organizer/organizer';
 import { executePlan } from './modules/auto-organizer/move-executor';
 import { undoMove, undoSession, getUndoHistory, getSessionDetails } from './modules/auto-organizer/undo-manager';
@@ -216,6 +216,10 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IpcChannels.GEMINI_SET_KEY, (_event, apiKey: string) => {
     setGeminiApiKey(apiKey);
     return true;
+  });
+
+  ipcMain.handle(IpcChannels.GEMINI_TEST, async () => {
+    return await testGeminiConnection();
   });
 
   // ── Auto-Organizer ─────────────────────────────

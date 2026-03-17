@@ -98,6 +98,12 @@ export default function ScannerPage() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showApiKeyForm, setShowApiKeyForm] = useState(false);
   const [categories, setCategories] = useState<Array<{ id: number; slug: string; name: string; color: string }>>([]);
+  const [aiTestResult, setAiTestResult] = useState<{
+    ok: boolean; model: string;
+    response: Array<{ file: string; category: string; confidence: number; reason: string }>;
+    error?: string;
+  } | null>(null);
+  const [isTesting, setIsTesting] = useState(false);
 
   // Load managed folders, Gemini key status, and categories on mount
   useEffect(() => {
@@ -192,6 +198,25 @@ export default function ScannerPage() {
       addToast('success', t('toast.apiKeySaved'));
     } catch (err) {
       addToast('error', t('toast.apiKeySaveFailed'));
+    }
+  };
+
+  const handleTestAi = async () => {
+    setIsTesting(true);
+    setAiTestResult(null);
+    try {
+      const result = await window.api.invoke('gemini:test') as typeof aiTestResult;
+      setAiTestResult(result);
+      if (result?.ok) {
+        addToast('success', t('scanner.aiTestSuccess'));
+      } else {
+        addToast('error', result?.error || t('scanner.aiTestFailed'));
+      }
+    } catch (err) {
+      setAiTestResult({ ok: false, model: '', response: [], error: String(err) });
+      addToast('error', t('scanner.aiTestFailed'));
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -305,7 +330,46 @@ export default function ScannerPage() {
             </div>
           )}
           {hasGeminiKey && (
-            <p className="text-xs text-success mt-1">{t('scanner.apiKeyConfigured')}</p>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-xs text-success">{t('scanner.apiKeyConfigured')}</p>
+              <button
+                onClick={handleTestAi}
+                disabled={isTesting}
+                className="text-xs text-accent hover:text-accent-hover cursor-pointer disabled:opacity-50 underline"
+              >
+                {isTesting ? t('scanner.aiTesting') : t('scanner.aiTestButton')}
+              </button>
+            </div>
+          )}
+
+          {/* Test AI Result */}
+          {aiTestResult && (
+            <div className={`mt-3 p-3 rounded-lg border text-xs ${
+              aiTestResult.ok
+                ? 'bg-success/10 border-success/30'
+                : 'bg-danger/10 border-danger/30'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className={`font-medium ${aiTestResult.ok ? 'text-success' : 'text-danger'}`}>
+                  {aiTestResult.ok ? t('scanner.aiTestSuccess') : t('scanner.aiTestFailed')}
+                </span>
+                <span className="text-faint">({aiTestResult.model})</span>
+              </div>
+              {aiTestResult.error && (
+                <p className="text-danger mb-2">{aiTestResult.error}</p>
+              )}
+              {aiTestResult.response.length > 0 && (
+                <div className="space-y-1.5">
+                  {aiTestResult.response.map((r, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="text-foreground font-mono truncate max-w-[120px]">{r.file}</span>
+                      <span className="text-accent font-medium">{r.category}</span>
+                      <span className="text-faint">({Math.round(r.confidence * 100)}%)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <p className="text-xs text-faint mt-3">{t('scanner.aiHint')}</p>

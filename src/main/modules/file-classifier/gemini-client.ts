@@ -60,6 +60,62 @@ export function hasGeminiApiKey(): boolean {
   return getGeminiApiKey() !== null;
 }
 
+/**
+ * Test the Gemini API connection with sample file paths.
+ * Returns the model's response so the user can verify it works.
+ */
+export async function testGeminiConnection(): Promise<{
+  ok: boolean;
+  model: string;
+  response: Array<{ file: string; category: string; confidence: number; reason: string }>;
+  error?: string;
+}> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    return { ok: false, model: GEMINI_MODEL, response: [], error: 'No API key configured' };
+  }
+
+  // Sample file paths that test different categories
+  const testFiles = [
+    'C:/Users/Test/Desktop/Work/Clients/LOC/contract_2025.pdf',
+    'C:/Users/Test/Downloads/neural_networks_lecture.pptx',
+    'G:/hard/Work/Projects/Clawdbot/src/index.ts',
+    'C:/Users/Test/Desktop/vacation_photo_2025.jpg',
+    'C:/Users/Test/Downloads/nodejs-v20-setup.exe',
+  ];
+
+  try {
+    const categoryList = getCategoryListForPrompt();
+    const fileList = testFiles.map((fp, idx) => `${idx + 1}. ${fp}`).join('\n');
+    const prompt = buildClassificationPrompt(categoryList, fileList);
+    const text = await callGemini(prompt, apiKey);
+    const parsed = extractJsonArray(text) as Array<{
+      index: number;
+      category: string;
+      confidence: number;
+      reason: string;
+    }>;
+
+    const response = parsed
+      .filter(item => item.index >= 1 && item.index <= testFiles.length)
+      .map(item => ({
+        file: testFiles[item.index - 1].split(/[\\/]/).pop() || testFiles[item.index - 1],
+        category: item.category,
+        confidence: item.confidence,
+        reason: item.reason,
+      }));
+
+    return { ok: true, model: GEMINI_MODEL, response };
+  } catch (err) {
+    return {
+      ok: false,
+      model: GEMINI_MODEL,
+      response: [],
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export interface ClassifyResult {
   classified: GeminiClassification[];
   needsReview: ReviewItem[];

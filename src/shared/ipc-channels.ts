@@ -55,6 +55,7 @@ export const IpcChannels = {
   // Gemini
   GEMINI_HAS_KEY: 'gemini:has-key',
   GEMINI_SET_KEY: 'gemini:set-key',
+  GEMINI_TEST: 'gemini:test',
 
   // Background Watcher
   WATCHER_NEW_FILE: 'watcher:new-file',

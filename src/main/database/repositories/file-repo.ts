@@ -81,6 +81,11 @@ export function updateFileCategory(id: number, categoryId: number, method: strin
 
 export function updateFilePath(id: number, newPath: string, newFilename?: string): void {
   const db = getDatabase();
+
+  // Remove any existing record with this destination path to avoid UNIQUE constraint violation.
+  // This happens when re-organizing files that were already tracked at the destination.
+  db.prepare('DELETE FROM tracked_files WHERE current_path = ? AND id != ?').run(newPath, id);
+
   if (newFilename) {
     db.prepare('UPDATE tracked_files SET current_path = ?, filename = ?, is_organized = 1 WHERE id = ?')
       .run(newPath, newFilename, id);

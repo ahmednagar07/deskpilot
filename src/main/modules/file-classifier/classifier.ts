@@ -265,7 +265,15 @@ function discoverFiles(dirPath: string, maxDepth: number, depth = 0): string[] {
       }
     } else if (entry.isFile()) {
       const ext = path.extname(entry.name).toLowerCase();
-      if (!SKIP_EXTENSIONS.has(ext) && !entry.name.startsWith('~$')) {
+      const nameLower = entry.name.toLowerCase();
+      if (
+        !SKIP_EXTENSIONS.has(ext) &&
+        !entry.name.startsWith('~$') &&
+        !entry.name.startsWith('.') &&
+        nameLower !== 'thumbs.db' &&
+        nameLower !== 'desktop.ini' &&
+        nameLower !== 'icon\r'
+      ) {
         results.push(fullPath);
       }
     }

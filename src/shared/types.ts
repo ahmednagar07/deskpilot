@@ -33,7 +33,7 @@ export interface MoveLogEntry {
   old_filename: string | null;
   new_filename: string | null;
   session_id: string;
-  operation: 'move' | 'rename' | 'delete';
+  operation: 'move' | 'rename' | 'delete' | 'copy';
   is_undone: boolean;
   executed_at: string;
   undone_at: string | null;

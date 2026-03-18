@@ -227,15 +227,24 @@ export function registerIpcHandlers(): void {
     return generateMovePlan(folderPaths);
   });
 
-  ipcMain.handle(IpcChannels.ORGANIZER_EXECUTE, async (event, approvedItems: MovePlanItem[]) => {
-    const spaceCheck = await checkDiskSpace(approvedItems);
-    if (!spaceCheck.ok) {
-      return { error: 'Not enough disk space', ...spaceCheck };
+  ipcMain.handle(IpcChannels.ORGANIZER_EXECUTE, async (event, approvedItems: MovePlanItem[], options?: { mode?: 'move' | 'copy'; duplicates?: 'skip' | 'overwrite' | 'rename' }) => {
+    const moveOptions = {
+      mode: options?.mode || 'move',
+      duplicates: options?.duplicates || 'rename',
+    } as import('./modules/auto-organizer/move-executor').MoveOptions;
+
+    // Only check disk space for move/cross-drive — copy mode always needs space
+    if (moveOptions.mode === 'move') {
+      const spaceCheck = await checkDiskSpace(approvedItems);
+      if (!spaceCheck.ok) {
+        return { error: 'Not enough disk space', ...spaceCheck };
+      }
     }
+
     const senderWindow = BrowserWindow.fromWebContents(event.sender);
     return await executePlan(approvedItems, (progress) => {
       senderWindow?.webContents.send(IpcChannels.ORGANIZER_MOVE_PROGRESS, progress);
-    });
+    }, moveOptions);
   });
 
   ipcMain.handle(IpcChannels.ORGANIZER_UNDO, async (_event, moveLogId: number) => {

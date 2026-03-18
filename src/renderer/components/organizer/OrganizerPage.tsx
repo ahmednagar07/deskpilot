@@ -30,6 +30,19 @@ function buildDestPath(item: MovePlanItem, targetPath: string): string {
   return `${base}/${fileName}`;
 }
 
+interface ExecutionResultData {
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  sessionId: string;
+  errors: Array<{ path: string; error: string }>;
+  warnings: Array<{ path: string; warning: string }>;
+  categoryBreakdown: Array<{ category: string; count: number }>;
+  totalBytes: number;
+  elapsedMs: number;
+  mode: 'move' | 'copy';
+}
+
 const MAX_BATCH_APPROVE = 100;
 
 export default function OrganizerPage() {
@@ -42,7 +55,11 @@ export default function OrganizerPage() {
 
   const addToast = useToastStore(s => s.addToast);
   const [activeTab, setActiveTab] = useState<'plan' | 'history'>('plan');
-  const [executionResult, setExecutionResult] = useState<{ succeeded: number; failed: number; firstError?: string } | null>(null);
+  const [executionResult, setExecutionResult] = useState<ExecutionResultData | null>(null);
+
+  // Move options
+  const [moveMode, setMoveMode] = useState<'move' | 'copy'>('move');
+  const [duplicateMode, setDuplicateMode] = useState<'skip' | 'overwrite' | 'rename'>('rename');
 
   // Safety: plan analysis + confirmation
   const [analysis, setAnalysis] = useState<PlanAnalysis | null>(null);
@@ -165,14 +182,10 @@ export default function OrganizerPage() {
     if (approved.length === 0) return;
 
     setIsExecuting(true);
+    setExecutionResult(null);
     setMoveProgress({ current: 0, total: approved.length, currentFile: '', bytesProcessed: 0, totalBytes: 0, startedAt: Date.now() });
     try {
-      const result = await window.api.invoke('organizer:execute', approved) as {
-        succeeded: number; failed: number; sessionId: string;
-        errors: Array<{ path: string; error: string }>;
-        warnings: Array<{ path: string; warning: string }>;
-        error?: string;
-      };
+      const result = await window.api.invoke('organizer:execute', approved, { mode: moveMode, duplicates: duplicateMode }) as ExecutionResultData & { error?: string };
 
       if (result.error) {
         console.error('Execute error:', result.error);
@@ -180,20 +193,8 @@ export default function OrganizerPage() {
         return;
       }
 
-      setExecutionResult({ succeeded: result.succeeded, failed: result.failed, firstError: result.errors?.[0]?.error });
-
-      if (result.failed > 0 && result.succeeded > 0) {
-        addToast('warning', `${result.succeeded} ${t('common.files')} moved, ${result.failed} failed`);
-      } else if (result.failed > 0 && result.succeeded === 0) {
-        const firstError = result.errors?.[0]?.error || 'Unknown error';
-        addToast('error', `${t('toast.moveFailed')}: ${firstError}`);
-      } else {
-        addToast('success', t('organizer.moveFiles', { count: result.succeeded }));
-      }
-
-      if (result.warnings?.length > 0) {
-        addToast('info', `${result.warnings.length} files copied but source could not be trashed`);
-      }
+      // Show the detailed results card (persistent, not a toast)
+      setExecutionResult(result);
 
       // Remove succeeded items from plan
       const failedPaths = new Set(result.errors?.map(e => e.path) || []);
@@ -439,24 +440,20 @@ export default function OrganizerPage() {
             <PlanSummaryCard analysis={analysis} t={t} organizedRoot={organizedRoot} />
           )}
 
-          {/* Execution result */}
+          {/* Detailed Execution Results Card */}
           {executionResult && (
-            <div className={`p-3 rounded-xl border text-sm ${
-              executionResult.failed === 0
-                ? 'bg-success/10 border-success/30 text-success'
-                : executionResult.succeeded === 0
-                  ? 'bg-danger/10 border-danger/30 text-danger'
-                  : 'bg-warning/10 border-warning/30 text-warning'
-            }`}>
-              <div>
-                {executionResult.succeeded > 0 && t('organizer.filesMoved', { count: executionResult.succeeded })}
-                {executionResult.succeeded > 0 && executionResult.failed > 0 && '. '}
-                {executionResult.failed > 0 && `${executionResult.failed} failed.`}
-              </div>
-              {executionResult.firstError && executionResult.failed > 0 && (
-                <div className="text-xs mt-1 opacity-80">{executionResult.firstError}</div>
-              )}
-            </div>
+            <ExecutionResultCard result={executionResult} onDismiss={() => setExecutionResult(null)} t={t} />
+          )}
+
+          {/* Move Options */}
+          {plan.length > 0 && !executionResult && (
+            <MoveOptionsPanel
+              moveMode={moveMode}
+              setMoveMode={setMoveMode}
+              duplicateMode={duplicateMode}
+              setDuplicateMode={setDuplicateMode}
+              t={t}
+            />
           )}
 
           {/* Approval bar */}
@@ -880,6 +877,219 @@ function MoveProgressOverlay({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ─── Category Dock Pill ───────────────────────────────────────────────────────
+
+// ─── Move Options Panel ───────────────────────────────────────────────────────
+
+function MoveOptionsPanel({
+  moveMode,
+  setMoveMode,
+  duplicateMode,
+  setDuplicateMode,
+  t,
+}: {
+  moveMode: 'move' | 'copy';
+  setMoveMode: (mode: 'move' | 'copy') => void;
+  duplicateMode: 'skip' | 'overwrite' | 'rename';
+  setDuplicateMode: (mode: 'skip' | 'overwrite' | 'rename') => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  return (
+    <div className="v-card p-4">
+      <div className="flex flex-wrap items-center gap-6">
+        {/* Move mode */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-faint uppercase tracking-wider">{t('organizer.moveMode')}</span>
+          <div className="flex rounded-lg border border-edge overflow-hidden">
+            <button
+              onClick={() => setMoveMode('move')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                moveMode === 'move'
+                  ? 'bg-accent text-white'
+                  : 'bg-surface text-muted hover:bg-hover/50'
+              }`}
+            >
+              {t('organizer.modeMove')}
+            </button>
+            <button
+              onClick={() => setMoveMode('copy')}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer border-l border-edge ${
+                moveMode === 'copy'
+                  ? 'bg-accent text-white'
+                  : 'bg-surface text-muted hover:bg-hover/50'
+              }`}
+            >
+              {t('organizer.modeCopy')}
+            </button>
+          </div>
+        </div>
+
+        {/* Duplicate handling */}
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-faint uppercase tracking-wider">{t('organizer.duplicates')}</span>
+          <div className="flex rounded-lg border border-edge overflow-hidden">
+            {(['rename', 'skip', 'overwrite'] as const).map((mode) => (
+              <button
+                key={mode}
+                onClick={() => setDuplicateMode(mode)}
+                className={`px-3 py-1.5 text-xs font-medium transition-colors cursor-pointer ${
+                  mode !== 'rename' ? 'border-l border-edge' : ''
+                } ${
+                  duplicateMode === mode
+                    ? 'bg-accent text-white'
+                    : 'bg-surface text-muted hover:bg-hover/50'
+                }`}
+              >
+                {t(`organizer.dup${mode.charAt(0).toUpperCase() + mode.slice(1)}`)}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Mode description */}
+        <span className="text-xs text-faint">
+          {moveMode === 'move' ? t('organizer.moveModeDesc') : t('organizer.copyModeDesc')}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Execution Result Card ────────────────────────────────────────────────────
+
+function ExecutionResultCard({
+  result,
+  onDismiss,
+  t,
+}: {
+  result: ExecutionResultData;
+  onDismiss: () => void;
+  t: (key: string, vars?: Record<string, string | number>) => string;
+}) {
+  const allGood = result.failed === 0 && result.skipped === 0;
+  const hasErrors = result.failed > 0;
+  const elapsed = result.elapsedMs / 1000;
+
+  const formatTime = (secs: number): string => {
+    if (secs < 1) return '<1s';
+    if (secs < 60) return `${Math.round(secs)}s`;
+    const m = Math.floor(secs / 60);
+    const s = Math.round(secs % 60);
+    return `${m}m ${s}s`;
+  };
+
+  return (
+    <div className={`v-card overflow-hidden border-2 ${
+      allGood ? 'border-success/40' : hasErrors ? 'border-danger/40' : 'border-warning/40'
+    }`}>
+      {/* Header */}
+      <div className={`px-5 py-4 flex items-center justify-between ${
+        allGood ? 'bg-success/10' : hasErrors ? 'bg-danger/10' : 'bg-warning/10'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            allGood ? 'bg-success/20' : hasErrors ? 'bg-danger/20' : 'bg-warning/20'
+          }`}>
+            {allGood ? (
+              <svg className="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 text-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            )}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-foreground font-[Sora]">
+              {allGood ? t('organizer.resultSuccess') : t('organizer.resultPartial')}
+            </h3>
+            <p className="text-xs text-faint">
+              {result.mode === 'copy' ? t('organizer.resultCopied') : t('organizer.resultMoved')} • {formatTime(elapsed)}
+            </p>
+          </div>
+        </div>
+        <button onClick={onDismiss} className="text-faint hover:text-muted cursor-pointer p-1">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Stats row */}
+      <div className="px-5 py-4 grid grid-cols-2 sm:grid-cols-4 gap-4 border-b border-edge">
+        <div>
+          <div className="text-2xl font-bold text-success">{result.succeeded}</div>
+          <div className="text-xs text-faint">{t('organizer.resultSucceeded')}</div>
+        </div>
+        <div>
+          <div className="text-2xl font-bold text-foreground">{formatBytes(result.totalBytes)}</div>
+          <div className="text-xs text-faint">{t('organizer.resultDataProcessed')}</div>
+        </div>
+        {result.failed > 0 && (
+          <div>
+            <div className="text-2xl font-bold text-danger">{result.failed}</div>
+            <div className="text-xs text-faint">{t('organizer.resultFailed')}</div>
+          </div>
+        )}
+        {result.skipped > 0 && (
+          <div>
+            <div className="text-2xl font-bold text-warning">{result.skipped}</div>
+            <div className="text-xs text-faint">{t('organizer.resultSkipped')}</div>
+          </div>
+        )}
+      </div>
+
+      {/* Category breakdown */}
+      {result.categoryBreakdown.length > 0 && (
+        <div className="px-5 py-4 border-b border-edge">
+          <div className="text-xs text-faint uppercase tracking-wider mb-3">{t('organizer.categoryBreakdown')}</div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {result.categoryBreakdown.map(cat => (
+              <div key={cat.category} className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-surface/50">
+                <span className="text-foreground font-medium">{cat.category}</span>
+                <span className="text-faint">{cat.count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Errors */}
+      {result.errors.length > 0 && (
+        <div className="px-5 py-4 border-b border-edge">
+          <div className="text-xs text-danger uppercase tracking-wider mb-2">{t('organizer.resultErrors')}</div>
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
+            {result.errors.slice(0, 10).map((err, i) => (
+              <div key={i} className="text-xs text-danger/80 flex gap-2">
+                <span className="shrink-0">•</span>
+                <span className="truncate font-mono">{err.path.split(/[\\/]/).pop()}</span>
+                <span className="text-faint">—</span>
+                <span>{err.error}</span>
+              </div>
+            ))}
+            {result.errors.length > 10 && (
+              <div className="text-xs text-faint">...and {result.errors.length - 10} more</div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Warnings */}
+      {result.warnings.length > 0 && (
+        <div className="px-5 py-4">
+          <div className="text-xs text-warning uppercase tracking-wider mb-2">{t('organizer.resultWarnings')}</div>
+          <div className="space-y-1 max-h-24 overflow-y-auto">
+            {result.warnings.slice(0, 5).map((w, i) => (
+              <div key={i} className="text-xs text-warning/80">• {w.warning}</div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

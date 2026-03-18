@@ -15,8 +15,15 @@ Electron + React + Tailwind + SQLite + Gemini API.
 - [x] Iteration 9: Background Watcher (2026-03-16)
 - [x] Iteration 10: Dashboard + Settings (2026-03-16)
 
-## Current State — v0.6.0 Smart Context-Aware Organization
+## Current State — v0.7.0 Move Options + Results Card
 All 6 pages fully implemented + premium UI + security hardening + light/dark theme + i18n everywhere + scheduled auto-scans + batch rename + cross-platform builds.
+
+### v0.7.0 Move Options + Detailed Results (2026-03-18)
+- **Move options panel**: Choose between Move (delete source) or Copy Only (keep source). Duplicate handling: Rename (append number), Skip (leave existing), or Overwrite (replace).
+- **Detailed results card**: After organizing, a persistent card shows: succeeded/failed/skipped counts, data processed, elapsed time, per-category breakdown, error details, and warnings. Replaces the old 2-second toast.
+- **Junk folder filter**: Context-aware organizer now filters out "New folder", "New folder (2)", "Untitled folder", "temp", "downloads" etc. from destination subfolder names. Previously these junk names leaked into the organized folder structure.
+- **IPC changes**: `organizer:execute` now accepts optional `{ mode, duplicates }` options object as second argument.
+- **ExecutionResult enhanced**: Now includes `skipped`, `categoryBreakdown`, `totalBytes`, `elapsedMs`, `mode` fields for the results card.
 
 ### v0.6.0 Smart Organization + Progress Bar (2026-03-17)
 - **Context-aware organization**: Files in client/project paths (detected via `path_contains` rules) are organized into subfolders: `Organized/Clients/LOC/file.pdf` instead of flat `Organized/Documents/file.pdf`. Files without context fall back to type-based folders.

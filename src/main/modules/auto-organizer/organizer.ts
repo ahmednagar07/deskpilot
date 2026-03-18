@@ -28,6 +28,18 @@ interface PathContextRule {
   ruleValue: string;   // e.g. "LOC", "Clawdbot"
 }
 
+/** Folder names that should never be used as context subfolders */
+const JUNK_FOLDER_NAMES = [
+  /^new folder/i,
+  /^untitled folder/i,
+  /^temp$/i,
+  /^tmp$/i,
+  /^new$/i,
+  /^folder$/i,
+  /^desktop$/i,
+  /^downloads$/i,
+];
+
 /**
  * Load path_contains rules from the database.
  * These tell us which folder names map to which categories (Clients, Projects, etc.)
@@ -70,7 +82,13 @@ function extractContextSubfolder(filePath: string, contextRules: PathContextRule
         // Found the context folder. Use the matched folder name as-is (preserving case)
         // and include any subfolders between it and the filename
         const contextFolder = parts[i];
-        const subParts = parts.slice(i + 1, parts.length - 1); // folders after match, before filename
+
+        // Skip junk folder names (e.g. "New folder", "New folder (2)")
+        if (JUNK_FOLDER_NAMES.some(p => p.test(contextFolder))) continue;
+
+        // Filter out junk subfolders too
+        const subParts = parts.slice(i + 1, parts.length - 1)
+          .filter(p => !JUNK_FOLDER_NAMES.some(junk => junk.test(p)));
 
         if (subParts.length > 0) {
           return `${contextFolder}/${subParts.join('/')}`;

@@ -15,12 +15,30 @@ export interface MoveProgress {
   totalBytes: number;
 }
 
+export interface MoveOptions {
+  /** 'move' = move file (delete source), 'copy' = copy only (keep source) */
+  mode: 'move' | 'copy';
+  /** How to handle files that already exist at destination */
+  duplicates: 'skip' | 'overwrite' | 'rename';
+}
+
+export const DEFAULT_MOVE_OPTIONS: MoveOptions = {
+  mode: 'move',
+  duplicates: 'rename',
+};
+
 export interface ExecutionResult {
   succeeded: number;
   failed: number;
+  skipped: number;
   sessionId: string;
   errors: Array<{ fileId: number; path: string; error: string }>;
   warnings: Array<{ fileId: number; path: string; warning: string }>;
+  /** Breakdown by category for the results card */
+  categoryBreakdown: Array<{ category: string; count: number }>;
+  totalBytes: number;
+  elapsedMs: number;
+  mode: 'move' | 'copy';
 }
 
 /**
@@ -36,14 +54,21 @@ export interface ExecutionResult {
 export async function executePlan(
   approvedItems: MovePlanItem[],
   onProgress?: (progress: MoveProgress) => void,
+  options: MoveOptions = DEFAULT_MOVE_OPTIONS,
 ): Promise<ExecutionResult> {
+  const startTime = Date.now();
   const sessionId = crypto.randomUUID();
   const result: ExecutionResult = {
     succeeded: 0,
     failed: 0,
+    skipped: 0,
     sessionId,
     errors: [],
     warnings: [],
+    categoryBreakdown: [],
+    totalBytes: 0,
+    elapsedMs: 0,
+    mode: options.mode,
   };
 
   // Pre-check: verify all source files still exist before starting the batch
@@ -76,11 +101,35 @@ export async function executePlan(
 
   let bytesProcessed = 0;
   let processedCount = 0;
+  const categoryCountMap = new Map<string, number>();
 
   for (const item of validItems) {
     try {
-      // Resolve destination collisions
-      const finalDest = resolveCollision(item.destPath, (p) => fs.existsSync(p));
+      // Handle duplicate files at destination
+      const destExists = fs.existsSync(item.destPath);
+      let finalDest: string;
+
+      if (destExists) {
+        switch (options.duplicates) {
+          case 'skip':
+            result.skipped++;
+            processedCount++;
+            bytesProcessed += itemSizes.get(item.fileId) || 0;
+            onProgress?.({ current: processedCount, total: validItems.length, currentFile: item.currentName, bytesProcessed, totalBytes });
+            continue;
+          case 'overwrite':
+            finalDest = item.destPath;
+            // Remove existing file before overwriting
+            try { fs.unlinkSync(finalDest); } catch { /* ignore */ }
+            break;
+          case 'rename':
+          default:
+            finalDest = resolveCollision(item.destPath, (p) => fs.existsSync(p));
+            break;
+        }
+      } else {
+        finalDest = item.destPath;
+      }
 
       // Ensure destination directory exists
       const destDir = path.dirname(finalDest);
@@ -90,7 +139,10 @@ export async function executePlan(
       const destDrive = path.parse(finalDest).root;
       const sameDrive = sourceDrive.toLowerCase() === destDrive.toLowerCase();
 
-      if (sameDrive) {
+      if (options.mode === 'copy') {
+        // Copy-only mode: never delete source
+        await fs.promises.copyFile(item.currentPath, finalDest);
+      } else if (sameDrive) {
         // Atomic rename on same drive
         fs.renameSync(item.currentPath, finalDest);
       } else {
@@ -108,13 +160,17 @@ export async function executePlan(
         old_filename: item.currentName,
         new_filename: path.basename(finalDest),
         session_id: sessionId,
-        operation: item.currentName !== path.basename(finalDest) ? 'rename' : 'move',
+        operation: options.mode === 'copy' ? 'copy' : (item.currentName !== path.basename(finalDest) ? 'rename' : 'move'),
       });
 
       // Update tracked file
       fileRepo.updateFilePath(item.fileId, finalDest.replace(/\\/g, '/'), path.basename(finalDest));
 
       result.succeeded++;
+
+      // Track category breakdown
+      const catCount = categoryCountMap.get(item.category) || 0;
+      categoryCountMap.set(item.category, catCount + 1);
     } catch (err: unknown) {
       result.failed++;
       result.errors.push({
@@ -136,6 +192,13 @@ export async function executePlan(
       totalBytes,
     });
   }
+
+  // Build category breakdown for results card
+  result.categoryBreakdown = Array.from(categoryCountMap.entries())
+    .map(([category, count]) => ({ category, count }))
+    .sort((a, b) => b.count - a.count);
+  result.totalBytes = bytesProcessed;
+  result.elapsedMs = Date.now() - startTime;
 
   return result;
 }
